@@ -50,7 +50,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyD3-W9Y-2w3ZdnsHjgc0qo6Hl_i2fMiv6I",
     authDomain: "smart-wholesale.firebaseapp.com",
     // Realtime Database-এর জন্য এই লাইনটি আবশ্যক:
-    databaseURL: "https://smart-wholesale-default-rtdb.firebaseio.com", 
+    databaseURL: "https://smart-wholesale-default-rtdb.asia-southeast1.firebasedatabase.app/", 
     projectId: "smart-wholesale",
     storageBucket: "smart-wholesale.firebasestorage.app",
     messagingSenderId: "449335656306",
@@ -801,24 +801,26 @@ function handleManagerCreateSR(event) {
 }
 
 // ==========================================
-// ২. ক্লাউডে সেভ করার ফিক্সড ফাংশন
+// ২. ক্লাউডে সেভ করার ফিক্সড ফাংশন (সংশোধিত)
 // ==========================================
 function saveSRToCloud(srData) {
     // ফায়ারবেজ কানেক্টেড থাকলে ক্লাউডে পুশ করবে
-    if (db && firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== "AIzaSyD3-W9Y-2w3ZdnsHjgc0qo6Hl_i2fMiv6I") {
+    if (typeof db !== 'undefined' && db) {
         const keyId = srData.id || srData.srId;
         db.ref('srs/' + keyId).set(srData)
-            .then(() => console.log("SR অ্যাকাউন্ট ক্লাউডে সফলভাবে সেভ হয়েছে!"))
-            .catch((err) => console.error("Cloud Save Error:", err));
+            .then(() => console.log("✅ SR অ্যাকাউন্ট ক্লাউডে সফলভাবে সেভ হয়েছে!"))
+            .catch((err) => console.error("❌ Cloud Save Error:", err));
+    } else {
+        console.warn("⚠️ Firebase DB রেডি নেই, ডাটা ক্লাউডে সেভ হয়নি।");
     }
 }
 
 // ==========================================
-// ৩. অন্য ডিভাইস থেকে অটো-সিঙ্ক হওয়ার ফিক্সড ফাংশন
+// ৩. অন্য ডিভাইস থেকে অটো-সিঙ্ক হওয়ার ফিক্সড ফাংশন (সংশোধিত)
 // ==========================================
 function syncSRsFromCloud() {
     // ফায়ারবেজ না থাকলে স্কিপ করবে
-    if (!db || !firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "AIzaSyD3-W9Y-2w3ZdnsHjgc0qo6Hl_i2fMiv6I") return;
+    if (typeof db === 'undefined' || !db) return;
 
     db.ref('srs').on('value', (snapshot) => {
         const data = snapshot.val();
