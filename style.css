@@ -1,0 +1,289 @@
+/* ==========================================
+   1. GLOBAL VARIABLES & BASE STYLES
+   ========================================== */
+:root {
+    --primary-gradient: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+    --accent-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --bg-glass: rgba(255, 255, 255, 0.96);
+    --border-glass: rgba(255, 255, 255, 0.4);
+    --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+body, input, select, textarea, button, table {
+    font-family: 'SolaimanLipi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #111e2e);
+    background-size: 400% 400%;
+    animation: ambientGradient 14s ease infinite;
+    min-height: 100vh;
+    color: #1f2937;
+    position: relative;
+    overflow-x: hidden;
+}
+
+@keyframes ambientGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.style-zindex {
+    z-index: 10;
+}
+
+/* ==========================================
+   2. SPARKLE & BACKGROUND ANIMATION
+   ========================================== */
+#sparkle-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.floating-icon {
+    position: absolute;
+    color: rgba(255, 255, 255, 0.25);
+    font-size: 2rem;
+    animation: floatSparkle 6s ease-in-out infinite;
+    transition: all 0.5s ease;
+}
+
+@keyframes floatSparkle {
+    0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
+    50% { opacity: 0.8; transform: translateY(50vh) scale(1.2) rotate(180deg); }
+    100% { transform: translateY(-10vh) scale(0.5); opacity: 0; }
+}
+
+/* ==========================================
+   3. GLASSMORPHISM & CARDS
+   ========================================== */
+.glass-card {
+    background: var(--bg-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 18px;
+    border: 1px solid var(--border-glass);
+    box-shadow: var(--shadow-soft);
+    padding: 22px;
+    margin-bottom: 22px;
+    animation: fadeInUp 0.4s ease-out forwards;
+}
+
+.navbar-custom {
+    background: rgba(15, 32, 39, 0.95) !important;
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    z-index: 100;
+}
+
+.nav-button-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.nav-button-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.25);
+    background: #f8fafc;
+}
+
+.product-card {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    transition: all 0.25s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    border-color: #0d6efd;
+}
+
+.btn {
+    border-radius: 12px;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn:active {
+    transform: scale(0.96);
+}
+
+/* ==========================================
+   4. CUSTOM TABS & NAVIGATION
+   ========================================== */
+.custom-tab-btn {
+    background-color: #ffffff;
+    color: #495057;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px !important;
+    padding: 12px 16px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.custom-tab-btn:hover {
+    background-color: #f8f9fa;
+    color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.custom-tab-btn.tab-inventory.active {
+    background: linear-gradient(135deg, #0d6efd, #0b5ed7) !important;
+    color: #ffffff !important;
+    border-color: #0d6efd !important;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.custom-tab-btn.tab-setup.active {
+    background: linear-gradient(135deg, #6f42c1, #593196) !important;
+    color: #ffffff !important;
+    border-color: #6f42c1 !important;
+    box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+}
+
+.custom-tab-btn.tab-summary.active {
+    background: linear-gradient(135deg, #198754, #146c43) !important;
+    color: #ffffff !important;
+    border-color: #198754 !important;
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
+}
+
+.custom-tab-btn.tab-memo.active {
+    background: linear-gradient(135deg, #fd7e14, #d9680c) !important;
+    color: #ffffff !important;
+    border-color: #fd7e14 !important;
+    box-shadow: 0 4px 12px rgba(253, 126, 20, 0.3);
+}
+
+.custom-tab-btn.active .badge {
+    background-color: #ffffff !important;
+    color: #0d6efd !important;
+}
+
+/* ==========================================
+   5. TABLES & RESPONSIVE FIXES
+   ========================================== */
+.custom-table tbody tr {
+    transition: background 0.2s ease;
+}
+
+.custom-table tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.08) !important;
+}
+
+.table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table input.form-control, 
+.table select.form-select {
+    min-width: 110px !important;
+}
+
+.table input[type="tel"], 
+.table input[placeholder*="ফোন"] {
+    min-width: 130px !important;
+}
+
+.nav-tabs-container, 
+header, 
+.top-menu-area {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+#memoListSection, 
+.memo-list-container {
+    margin-top: 10px !important;
+    padding-top: 0 !important;
+}
+
+.tab-section.d-none, 
+.tab-pane:not(.active) {
+    display: none !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ==========================================
+   6. PRINT STYLES
+   ========================================== */
+@media print {
+    body { 
+        background: #fff !important; 
+    }
+
+    body * {
+        visibility: hidden;
+    }
+
+    #summaryTab, #summaryTab * {
+        visibility: visible;
+    }
+
+    #summaryTab {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    body.memo-printing-mode #singleMemoPrintArea, 
+    body.memo-printing-mode #singleMemoPrintArea * {
+        visibility: visible;
+    }
+
+    body.memo-printing-mode #singleMemoPrintArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: block !important;
+    }
+
+    .no-print, .navbar, button {
+        display: none !important;
+    }
+}
