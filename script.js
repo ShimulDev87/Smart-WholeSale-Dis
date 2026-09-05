@@ -50,7 +50,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyD3-W9Y-2w3ZdnsHjgc0qo6Hl_i2fMiv6I",
     authDomain: "smart-wholesale.firebaseapp.com",
     // Realtime Database-এর জন্য এই লাইনটি আবশ্যক:
-    databaseURL: "https://smart-wholesale-default-rtdb.asia-southeast1.firebasedatabase.app/", 
+    databaseURL: "https://smart-wholesale-default-rtdb.asia-southeast1.firebasedatabase.app", 
     projectId: "smart-wholesale",
     storageBucket: "smart-wholesale.firebasestorage.app",
     messagingSenderId: "449335656306",
