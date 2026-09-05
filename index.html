@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    
+    <title>Smart Wholesale - অটোমেশন ও ইনভেন্টরি</title>
+
+    <!-- Stylesheets -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.maateen.me/solaiman-lipi/font.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Confetti Script -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+
+    <!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<!-- এই লাইনটি নতুন যুক্ত করবেন Database-এর জন্য -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <!-- SR সরাসরি আইডি দিয়ে লগইন মডাল -->
+<div class="modal fade" id="srAuthModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            
+            <!-- মডাল হেডার -->
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="srAuthTitle">
+                    <i class="fa-solid fa-right-to-bracket me-2"></i>এসআর লগইন
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <!-- মডাল বডি (শুধুমাত্র SR ID দিয়ে প্রবেশ) -->
+            <div class="modal-body p-4">
+                <form id="srLoginForm" onsubmit="handleSRLogin(event)">
+                    <div class="mb-3">
+                        <label for="loginSrId" class="form-label fw-bold fs-7">এসআর আইডি</label>
+                        <input 
+                            type="text" 
+                            id="loginSrId" 
+                            class="form-control" 
+                            placeholder="ম্যানেজারের দেয়া SR ID লিখুন" 
+                            required
+                        >
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">
+                        প্যানেলে ঢুকুন
+                    </button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+    <!-- Background Sparkle Container -->
+    <div id="sparkle-container"></div>
+
+    <!-- Main Header Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom sticky-top py-2 no-print">
+        <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
+            
+            <a class="navbar-brand d-flex align-items-center fw-bold text-warning mb-0" href="#" onclick="showHomeView(); return false;">
+                <i class="fa-solid fa-boxes-packing fs-3 me-2"></i>
+                <span>Smart Wholesale</span>
+            </a>
+
+            <div class="d-flex align-items-center gap-2">
+                <h4 id="displayCompanyName" class="fw-bold text-white mb-0 fs-5">স্মার্ট হোলসেল ডিস্ট্রিবিউশন</h4>
+                <button class="btn btn-sm btn-outline-light rounded-circle shadow-sm" title="কোম্পানির নাম পরিবর্তন করুন" onclick="openEditCompanyModal()">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <button id="authBtn" class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="openAuthModal()">
+                    <i class="fa-solid fa-user-circle me-1"></i> <span id="authBtnText">সাইন ইন / অ্যাকাউন্ট</span>
+                </button>
+                <button class="btn btn-sm btn-warning rounded-pill px-3" onclick="showHomeView()">
+                    <i class="fa-solid fa-house me-1"></i> হোম
+                </button>
+            </div>
+
+        </div>
+    </nav>
+
+    <!-- MAIN HOME MENU -->
+    <div id="home-view" class="view-section">
+        <div class="glass-card text-center my-4">
+            <h2 class="fw-bold text-dark text-center mb-2">
+                স্বাগতম, <span id="welcomeCompanyName" class="text-primary">স্মার্ট হোলসেল ডিস্ট্রিবিউশন</span>
+            </h2>
+            <p class="text-muted">আপনার প্যানেলে প্রবেশ করতে নিচের অপশন বেছে নিন</p>
+            
+            <div class="row g-4 justify-content-center mt-2">
+                <div class="col-md-5">
+                    <div class="nav-button-card border-top border-primary border-5" onclick="openManagerPanel()">
+                        <i class="fa-solid fa-user-shield text-primary display-4 mb-3"></i>
+                        <h4 class="fw-bold text-dark">ম্যানেজার / ওনার প্যানেল</h4>
+                        <p class="text-muted small m-0">বিভাগ, জেলা, রুট, বাজার ও দোকান সেটআপ এবং ইনভেন্টরি</p>
+                        <span class="badge bg-primary rounded-pill mt-3 px-3 py-2"><i class="fa-solid fa-user-lock me-1"></i>লগইন সুরক্ষিত</span>
+                    </div>
+                </div>
+
+                <div class="col-md-5">
+                    <div class="nav-button-card border-top border-success border-5" onclick="switchToSRView()">
+                        <i class="fa-solid fa-cart-shopping text-success display-4 mb-3"></i>
+                        <h4 class="fw-bold text-dark">এসআর (SR) অর্ডার প্যানেল</h4>
+                        <p class="text-muted small m-0">রুট ও বাজার ভিত্তিক দোকানের অর্ডার এনট্রি করুন</p>
+                        <span class="badge bg-success rounded-pill mt-3 px-3 py-2"><i class="fa-solid fa-bolt me-1"></i>সরাসরি প্রবেশ</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SR ORDER PANEL VIEW -->
+    <div id="sr-view" class="view-section d-none">
+        <div class="glass-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-success m-0"><i class="fa-solid fa-cart-shopping me-2"></i>এসআর সেলস অর্ডার প্যানেল</h5>
+                <button class="btn btn-sm btn-secondary rounded-pill" onclick="showHomeView()"><i class="fa-solid fa-arrow-left me-1"></i> হোম</button>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-md-4">
+    <label class="form-label fw-bold">এসআর নাম:</label>
+    <div class="input-group">
+        <input type="text" id="srNameInput" class="form-control bg-light" placeholder="এসআর নাম" readonly>
+        <button class="btn btn-outline-danger" type="button" onclick="logoutSR(event)" title="অ্যাকাউন্ট থেকে লগআউট করুন">
+            <i class="fa-solid fa-right-from-bracket me-1"></i> লগআউট
+        </button>
+    </div>
+</div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">রুট সিলেক্ট করুন:</label>
+                    <select id="srRouteSelect" class="form-select" onchange="onSRRouteSelect()">
+                        <option value="">-- রুট নির্বাচন করুন --</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">বাজার সিলেক্ট করুন:</label>
+                    <select id="srBazarSelect" class="form-select" onchange="onSRBazarSelect()">
+                        <option value="">-- বাজার নির্বাচন করুন --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="srShopGridArea" class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-store me-1"></i> বাজার দোকান স্লট (৫টি)</h6>
+                    <span id="shopCountBadge" class="badge bg-light text-dark border d-none"></span>
+                </div>
+                <div id="srShopGridContainer" class="row g-2"></div>
+            </div>
+
+          <div id="posSectionArea" class="d-none">
+    <div class="alert alert-info py-2 d-flex justify-content-between align-items-center mb-3">
+        <span><i class="fa-solid fa-shop me-2"></i>অর্ডার তৈরি করা হচ্ছে: <strong id="activeShopTitle" class="text-primary fs-6"></strong></span>
+        <button class="btn btn-sm btn-outline-secondary" onclick="resetShopSelection()">দোকান পরিবর্তন করুন</button>
+    </div>
+
+    <div class="row g-3">
+        <!-- অর্ডার কার্ট সেকশন -->
+        <div class="col-md-5 col-12 order-md-1 order-1">
+            <div class="p-3 bg-white rounded-3 border shadow-sm">
+                <h6 class="fw-bold mb-3 text-danger"><i class="fa-solid fa-receipt me-1"></i> অর্ডার কার্ট</h6>
+                
+                <!-- তারিখ সিলেক্ট করার ফিল্ড -->
+                <div class="mb-3 p-2 bg-light rounded border">
+                    <label class="form-label fw-bold small text-secondary mb-1">
+                        <i class="fa-regular fa-calendar-days me-1"></i>অর্ডারের তারিখ নির্বাচন করুন:
+                    </label>
+                    <input type="date" id="orderDateInput" class="form-control form-control-sm">
+                </div>
+
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr class="text-secondary fs-7">
+                                <th>আইটেম</th>
+                                <th>ইউনিট</th>
+                                <th style="width: 80px;">দর (৳)</th>
+                                <th style="width: 90px;">পরিমাণ</th>
+                                <th>মোট</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="cartTableBody">
+                            <tr><td colspan="6" class="text-center text-muted">কোনো প্রোডাক্ট যোগ করা হয়নি</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <hr>
+
+                <div class="d-flex justify-content-between fw-bold fs-5">
+                    <span>মোট বিল:</span>
+                    <span>৳ <span id="cartTotal">0</span></span>
+                </div>
+
+                <button class="btn btn-success w-100 mt-3 rounded-pill fw-bold" onclick="submitOrder()">
+                    <i class="fa-solid fa-check-circle me-1"></i> অর্ডার কনফার্ম করুন
+                </button>
+            </div>
+        </div>
+
+        <!-- প্রোডাক্ট তালিকা সেকশন -->
+        <div class="col-md-7 col-12 order-md-2 order-2">
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <input type="text" id="productSearchInput" class="form-control" placeholder="প্রোডাক্টের নাম দিয়ে খুঁজুন..." onkeyup="filterProducts()">
+                </div>
+                <div class="col-md-6">
+                    <select class="form-select" id="categoryFilter" onchange="filterProducts()">
+                        <option value="ALL">সকল ক্যাটাগরি</option>
+                        <option value="মুদি ও খাদ্য">মুদি ও খাদ্য (Grocery)</option>
+                        <option value="ফার্মেসি">ফার্মেসি (Pharmacy)</option>
+                        <option value="কনফেকশনারি">কনফেকশনারি (Confectionery)</option>
+                        <option value="ইলেক্ট্রনিক্স">ইলেক্ট্রনিক্স (Electronics)</option>
+                        <option value="স্টেশনারি">স্টেশনারি (Stationery)</option>
+                    </select>
+                </div>
+            </div>
+
+            <h6 class="fw-bold mb-3 text-primary"><i class="fa-solid fa-boxes-stacked me-1"></i> প্রোডাক্ট তালিকা</h6>
+            <div class="row g-2" id="productListContainer" style="max-height: 450px; overflow-y: auto;"></div>
+        </div>
+    </div>
+</div>
+
+        </div>
+    </div>
+
+    <!-- MANAGER / OWNER PANEL VIEW -->
+    <div id="manager-view" class="view-section d-none">
+        <div class="glass-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-primary m-0"><i class="fa-solid fa-user-gear me-2"></i>ম্যানেজার / ওনার কন্ট্রোল প্যানেল</h5>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="logoutManager()"><i class="fa-solid fa-right-from-bracket me-1"></i> লগআউট</button>
+                    <button class="btn btn-sm btn-secondary rounded-pill" onclick="showHomeView()"><i class="fa-solid fa-arrow-left me-1"></i> হোম</button>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="p-2 mb-4 rounded-4 bg-light border shadow-sm no-print">
+                <ul class="nav nav-pills nav-fill g-2" id="managerTabs" role="tablist">
+                    <li class="nav-item p-1" role="presentation">
+                        <button class="nav-link active custom-tab-btn tab-inventory" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory-pane" type="button" role="tab">
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <i class="fa-solid fa-boxes-stacked fs-5"></i>
+                                <span class="fw-bold">ইনভেন্টরি ও প্রোডাক্টস</span>
+                                <span class="badge bg-primary rounded-pill px-2" id="totalProductCount">0</span>
+                            </div>
+                        </button>
+                    </li>
+
+                    <li class="nav-item p-1" role="presentation">
+                        <button class="nav-link custom-tab-btn tab-setup" id="setup-tab" data-bs-toggle="tab" data-bs-target="#setup-pane" type="button" role="tab">
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <i class="fa-solid fa-map-location-dot fs-5"></i>
+                                <span class="fw-bold">রুট, বাজার ও দোকান সেটিংস</span>
+                            </div>
+                        </button>
+                    </li>
+
+                    <li class="nav-item p-1" role="presentation">
+                        <button class="nav-link custom-tab-btn tab-sr-setup" id="sr-setup-tab" data-bs-toggle="tab" data-bs-target="#sr-setup-pane" type="button" role="tab">
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <i class="fa-solid fa-user-gear fs-5"></i>
+                                <span class="fw-bold">এসআর অ্যাকাউন্ট সেটআপ</span>
+                            </div>
+                        </button>
+                    </li>
+
+                    <li class="nav-item p-1" role="presentation">
+                        <button class="nav-link custom-tab-btn tab-summary" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary-pane" type="button" role="tab">
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <i class="fa-solid fa-file-invoice-dollar fs-5"></i>
+                                <span class="fw-bold">আজকের চালান সামারি শিট</span>
+                            </div>
+                        </button>
+                    </li>
+
+                    <li class="nav-item p-1" role="presentation">
+                        <button class="nav-link custom-tab-btn tab-memo" id="memo-tab" data-bs-toggle="tab" data-bs-target="#memo-pane" type="button" role="tab">
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <i class="fa-solid fa-receipt fs-5"></i>
+                                <span class="fw-bold">মেমো তালিকা সেকশন</span>
+                            </div>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Tab Content Panels Container (সকল Pane সঠিক Parent-এ রাখা হয়েছে) -->
+            <div class="tab-content" id="managerTabContent">
+                
+                <!-- 1. Inventory Tab Pane -->
+                <div class="tab-pane fade show active" id="inventory-pane" role="tabpanel">
+                    <div class="row g-2 mb-3 align-items-center">
+                        <div class="col-md-3">
+                            <select id="mgrCategorySelect" class="form-select border-primary fw-bold text-primary" onchange="filterMgrProducts()">
+                                <option value="মুদি ও খাদ্য" selected>ক্যাটাগরি: মুদি ও খাদ্য</option>
+                                <option value="ফার্মেসি">ক্যাটাগরি: ফার্মেসি</option>
+                                <option value="কনফেকশনারি">ক্যাটাগরি: কনফেকশনারি</option>
+                                <option value="ইলেক্ট্রনিক্স">ক্যাটাগরি: ইলেক্ট্রনিক্স</option>
+                                <option value="স্টেশনারি">ক্যাটাগরি: স্টেশনারি</option>
+                                <option value="ALL">সকল ক্যাটাগরি</option>
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <input type="text" id="mgrSearchInput" class="form-control" placeholder="ইনভেন্টরিতে প্রোডাক্ট খুঁজুন..." onkeyup="filterMgrProducts()">
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="btn btn-primary rounded-pill btn-sm px-3 fw-bold" onclick="openAddProductModal()"><i class="fa-solid fa-plus me-1"></i> নতুন প্রোডাক্ট এড করুন</button>
+                        </div>
+                    </div>
+
+                    <!-- টেবিল হেডার ও ডাটা কলাম অ্যাডজাস্ট করা হয়েছে (৭টি কলাম) -->
+                    <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                        <table class="table table-hover align-middle custom-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>প্রোডাক্টের নাম</th>
+                                    <th>ক্যাটাগরি</th>
+                                    <th>ইউনিট (একক)</th>
+                                    <th>চলতি স্টক</th>
+                                    <th>পাইকারি মূল্য</th>
+                                    <th class="text-center">অ্যাকশন</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mgrProductTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 2. Setup Tab Pane -->
+                <div class="tab-pane fade" id="setup-pane" role="tabpanel">
+                    <div class="p-3 bg-light rounded border mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2">বিজনেস ক্যাটাগরি সেটিংস</h6>
+                        <p class="text-muted small mb-2">এখানে যা যা টিক দেবেন, ইনভেন্টরি, এসআর অর্ডার প্যানেল ও প্রোডাক্ট যোগ করার ফর্ম — সব জায়গায় শুধু সেই ক্যাটাগরিগুলোই দেখাবে।</p>
+                        <div class="row g-2" id="categorySettingsCheckboxArea"></div>
+                        <button class="btn btn-success rounded-pill mt-3 fw-bold px-4" onclick="saveOwnerCategories()">
+                            <i class="fa-solid fa-save me-1"></i> ক্যাটাগরি সেভ করুন
+                        </button>
+                    </div>
+
+                    <div class="p-3 bg-light rounded border mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2">১. বিভাগ, জেলা ও কাস্টম রুট সেটআপ</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">বিভাগ নির্বাচন করুন:</label>
+                                <select class="form-select" id="divisionSelect" onchange="loadDistricts()">
+                                    <option value="">-- বিভাগ বেছে নিন --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">জেলা নির্বাচন করুন:</label>
+                                <select class="form-select" id="districtSelect">
+                                    <option value="">-- জেলা বেছে নিন --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">নতুন রুটের নাম লিখুন:</label>
+                                <div class="input-group">
+                                    <input type="text" id="newRouteInput" class="form-control" placeholder="যেমন: ধানমন্ডি রুট">
+                                    <button class="btn btn-success" onclick="addRoute()">সেভ রুট</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded border">
+                        <h6 class="fw-bold text-primary border-bottom pb-2">২. রুট অনুযায়ী ৫টি বাজার এবং ১০টি দোকান ও মালিকের তথ্য সেটআপ</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">রুট সিলেক্ট করুন:</label>
+                                <select class="form-select" id="setupRouteSelect" onchange="loadBazarForm()">
+                                    <option value="">-- রুট নির্বাচন করুন --</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-dark">৫টি বাজারের নাম লিখুন (যে কোনো একটিতে ক্লিক করে দোকান সেটআপ করুন):</label>
+                            <div id="bazarInputsContainer" class="row g-2"></div>
+                        </div>
+
+                        <h6 id="shopSectionTitle" class="fw-bold my-3 text-primary">১০টি দোকানের তথ্য ইনপুট দিন:</h6>
+
+                        <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                            <table class="table table-bordered bg-white align-middle" style="min-width: 500px;">
+                                <thead class="table-secondary">
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">#</th>
+                                        <th>দোকানের নাম</th>
+                                        <th>মালিকের নাম</th>
+                                        <th>ফোন নম্বর</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="shopInputsContainer"></tbody>
+                            </table>
+                        </div>
+
+                        <button class="btn btn-success rounded-pill mt-3 fw-bold px-4" onclick="saveBazarAndShops()">
+                            <i class="fa-solid fa-save me-1"></i> এই রুটের তথ্য সেভ করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. SR Setup Tab Pane (সঠিক Tab Content-এর ভেতরে নিয়ে আসা হয়েছে) -->
+                <div class="tab-pane fade" id="sr-setup-pane" role="tabpanel">
+                    <div class="row g-4">
+                        <div class="col-md-5">
+                            <div class="card border-0 shadow-sm p-4 rounded-4">
+                                <h5 class="fw-bold mb-3 text-primary">
+                                    <i class="fa-solid fa-user-plus me-2"></i>নতুন এসআর অ্যাকাউন্ট তৈরি
+                                </h5>
+                                <form id="managerCreateSrForm" onsubmit="handleManagerCreateSR(event)">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">এসআর-এর নাম</label>
+                                        <input type="text" id="newSrName" class="form-control" placeholder="এসআর-এর নাম লিখুন" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">ফোন নম্বর (ইউজার আইডি)</label>
+                                        <input type="tel" id="newSrPhone" class="form-control" placeholder="017XXXXXXXX" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">অ্যাসাইনকৃত রুট</label>
+                                        <select id="newSrRouteSelect" class="form-select" onchange="onSrSetupRouteSelect()" required>
+                                            <option value="">-- রুট নির্বাচন করুন --</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">অ্যাসাইনকৃত বাজার</label>
+                                        <select id="newSrBazarSelect" class="form-select" required>
+                                            <option value="">-- বাজার নির্বাচন করুন --</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
+                                        <i class="fa-solid fa-check me-2"></i>অ্যাকাউন্ট তৈরি ও আইডি জেনারেট
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="col-md-7">
+                            <div class="card border-0 shadow-sm p-4 rounded-4">
+                                <h5 class="fw-bold mb-3 text-dark">
+                                    <i class="fa-solid fa-users me-2"></i>এসআর তালিকা ও জেনারেটকৃত আইডি
+                                </h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>এসআর আইডি</th>
+                                                <th>নাম</th>
+                                                <th>ফোন</th>
+                                                <th>অ্যাকশন</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="srListTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Daily Summary Tab Pane -->
+                <div class="tab-pane fade" id="summary-pane" role="tabpanel">
+                    <div class="card border-0 shadow-sm p-4 my-2">
+                        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                            <div>
+                                <h4 class="fw-bold mb-0">আজকের ডেলিভারি চালানের সামারি শিট</h4>
+                                <small class="text-muted" id="summaryDate"></small>
+                            </div>
+                            <button class="btn btn-dark no-print" onclick="window.print()">
+                                <i class="fa-solid fa-print me-1"></i> সামারি শিট প্রিন্ট করুন
+                            </button>
+                        </div>
+                        
+                        <div class="row my-3 text-center">
+                            <div class="col-md-4">
+                                <div class="p-3 bg-light rounded-3 border">
+                                    <h6>মোট অর্ডার সংখ্যা</h6>
+                                    <h3 class="fw-bold text-primary" id="summaryTotalOrders">০</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-light rounded-3 border">
+                                    <h6>মোট চালানের পরিমাণ</h6>
+                                    <h3 class="fw-bold text-success" id="summaryTotalAmount">৳ ০</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-light rounded-3 border">
+                                    <h6>মোট পণ্যের সংখ্যা</h6>
+                                    <h3 class="fw-bold text-warning" id="summaryTotalItems">০ টি</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold mt-2">গাড়িতে লোড দেওয়ার জন্য পণ্যভিত্তিক সমষ্টিকৃত চালান তালিকা:</h6>
+                        <table class="table table-bordered align-middle mt-2">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>পণ্যের নাম</th>
+                                    <th>ক্যাটাগরি</th>
+                                    <th>মোট পরিমাণ (বস্তা/কেজি/পিস)</th>
+                                    <th>মোট বিক্রয় মূল্য</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dailySummaryTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 5. Memo List Tab Pane -->
+                <div class="tab-pane fade" id="memo-pane" role="tabpanel">
+                    <div class="card border-0 shadow-sm p-4 my-2">
+                        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                            <h5 class="fw-bold mb-0"><i class="fa-solid fa-receipt me-2 text-primary"></i>সকল বিক্রয় মেমো তালিকা</h5>
+                            <button class="btn btn-sm btn-outline-primary" onclick="renderMemoList()"><i class="fa-solid fa-rotate me-1"></i>রিফ্রেশ করুন</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>মেমো নম্বর</th>
+                                        <th>তারিখ</th>
+                                        <th>এসআর (SR)</th>
+                                        <th>দোকান ও বাজার</th>
+                                        <th>মোট টাকা</th>
+                                        <th class="text-center">অ্যাকশন</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="memoListTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div> <!-- End of tab-content -->
+        </div>
+    </div>
+
+    <!-- Manager Register/Login Modal -->
+    <div class="modal fade" id="managerAuthModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="managerModalTitle"><i class="fa-solid fa-user-shield me-2"></i>স্টোর ও ম্যানেজার অ্যাকাউন্ট সেটআপ</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+
+                    <form id="managerRegisterForm" onsubmit="handleManagerRegister(event)">
+                        <div class="mb-2">
+                            <label class="form-label fw-bold fs-7">কোম্পানি / দোকানের নাম</label>
+                            <input type="text" id="setupCompanyName" class="form-control" placeholder="যেমন: স্মার্ট হোলসেল ডিস্ট্রিবিউশন" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold fs-7">ওনার / ম্যানেজারের নাম</label>
+                            <input type="text" id="setupOwnerName" class="form-control" placeholder="আপনার নাম লিখুন" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold fs-7">ফোন নম্বর (লগইন আইডি)</label>
+                            <input type="tel" id="setupPhone" class="form-control" placeholder="017xxxxxxxx" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-7">পাসওয়ার্ড তৈরি করুন</label>
+                            <input type="password" id="setupPassword" class="form-control" placeholder="******" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-7 d-block">বিজনেস ক্যাটাগরি (একাধিক সিলেক্ট করা যাবে):</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input owner-cat-checkbox" type="checkbox" value="মুদি ও খাদ্য" id="cat_grocery" checked>
+                                        <label class="form-check-label" for="cat_grocery">মুদি ও খাদ্য</label>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input owner-cat-checkbox" type="checkbox" value="ফার্মেসি" id="cat_pharmacy">
+                                        <label class="form-check-label" for="cat_pharmacy">ফার্মেসি</label>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input owner-cat-checkbox" type="checkbox" value="কনফেকশনারি" id="cat_confectionery">
+                                        <label class="form-check-label" for="cat_confectionery">কনফেকশনারি</label>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input owner-cat-checkbox" type="checkbox" value="ইলেক্ট্রনিক্স" id="cat_electronics">
+                                        <label class="form-check-label" for="cat_electronics">ইলেক্ট্রনিক্স</label>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input owner-cat-checkbox" type="checkbox" value="স্টেশনারি" id="cat_stationery">
+                                        <label class="form-check-label" for="cat_stationery">স্টেশনারি</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-dark w-100 fw-bold">অ্যাকাউন্ট তৈরি করুন ও প্যানেলে ঢুকুন</button>
+                        <div class="text-center mt-3">
+                            <small>আগে থেকেই অ্যাকাউন্ট আছে? <a href="#" onclick="showManagerAuthModal('login'); return false;">লগইন করুন</a></small>
+                        </div>
+                    </form>
+
+                    <form id="managerLoginForm" class="d-none" onsubmit="handleManagerLogin(event)">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-7">ফোন নম্বর</label>
+                            <input type="tel" id="loginManagerPhone" class="form-control" placeholder="017xxxxxxxx" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-7">পাসওয়ার্ড</label>
+                            <input type="password" id="loginManagerPassword" class="form-control" placeholder="******" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 fw-bold">লগইন করুন</button>
+                        <div class="text-center mt-3">
+                            <small>নতুন স্টোর সেটআপ করবেন? <a href="#" onclick="showManagerAuthModal('register'); return false;">রেজিস্টার করুন</a></small>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Firebase Auth Modal -->
+    <div class="modal fade" id="userAuthModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold">Firebase Authentication</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ইমেইল:</label>
+                        <input type="email" id="authUserEmail" class="form-control" placeholder="user@example.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">পাসওয়ার্ড:</label>
+                        <input type="password" id="authUserPass" class="form-control" placeholder="******">
+                    </div>
+                    <button class="btn btn-success w-100 rounded-pill mb-2" onclick="firebaseLogin()">লগইন</button>
+                    <button class="btn btn-outline-primary w-100 rounded-pill" onclick="firebaseSignUp()">নতুন সাইন আপ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add / Edit Product Modal -->
+    <div class="modal fade" id="productFormModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="productModalTitle"><i class="fa-solid fa-box-open me-2"></i>প্রোডাক্ট যোগ / এডিট করুন</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editProductId">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">প্রোডাক্টের নাম:</label>
+                            <input type="text" id="modalProductName" class="form-control" list="productSuggestions" placeholder="নাম টাইপ করুন বা লিস্ট থেকে সিলেক্ট করুন">
+                            <datalist id="productSuggestions">
+                                <option value="মিনিকেট চাল">
+                                <option value="নাজিরশাইল চাল">
+                                <option value="মসুর ডাল">
+                                <option value="আটা">
+                                <option value="ময়দা">
+                                <option value="চিনি">
+                                <option value="লবণ">
+                                <option value="সুজি">
+                                <option value="সোয়াবিন তেল">
+                                <option value="সরিষার তেল">
+                                <option value="নাপা এক্সট্রা">
+                                <option value="সার্জেল ২০">
+                                <option value="ডেয়ারি মিল্ক চকলেট">
+                                <option value="এলইডি বাল্ব ১২W">
+                                <option value="এ৪ পেপার রিম">
+                            </datalist>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">ক্যাটাগরি:</label>
+                            <select id="modalProductCategory" class="form-select">
+                                <option value="মুদি ও খাদ্য">মুদি ও খাদ্য</option>
+                                <option value="ফার্মেসি">ফার্মেসি</option>
+                                <option value="কনফেকশনারি">কনফেকশনারি</option>
+                                <option value="ইলেক্ট্রনিক্স">ইলেক্ট্রনিক্স</option>
+                                <option value="স্টেশনারি">স্টেশনারি</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">ইউনিট (একক):</label>
+                            <select id="modalProductUnit" class="form-select" onchange="toggleKgDropdown()">
+                                <option value="বস্তা">বস্তা</option>
+                                <option value="প্যাকেট">প্যাকেট</option>
+                                <option value="পিস">পিস</option>
+                                <option value="ডজন">ডজন</option>
+                                <option value="কেজি">কেজি</option>
+                                <option value="লিটার">লিটার</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4" id="kgDropdownWrapper">
+                            <label class="form-label fw-bold text-success">বস্তার ওজন (কেজি):</label>
+                            <select id="modalProductKgSelect" class="form-select border-success" onchange="handleCustomKgInput()">
+                                <option value="5 kg">5 kg</option>
+                                <option value="10 kg">10 kg</option>
+                                <option value="20 kg" selected>20 kg</option>
+                                <option value="30 kg">30 kg</option>
+                                <option value="50 kg">50 kg</option>
+                                <option value="CUSTOM">অন্যান্য (নিজেই লিখুন)</option>
+                            </select>
+                            <input type="text" id="modalCustomKgInput" class="form-control mt-2 d-none" placeholder="যেমন: 15 kg">
+                        </div>
+
+                        <div class="col-md-4" id="stockColWrapper">
+                            <label class="form-label fw-bold">স্টক (পরিমাণ):</label>
+                            <input type="number" id="modalProductStock" class="form-control" placeholder="যেমন: 100">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">পাইকারি মূল্য (৳):</label>
+                            <input type="number" id="modalProductPrice" class="form-control" placeholder="যেমন: 350">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">বাতিল</button>
+                    <button type="button" class="btn btn-success rounded-pill px-4 fw-bold" onclick="saveProduct()"><i class="fa-solid fa-save me-1"></i> সেভ করুন</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Company Name Modal -->
+    <div class="modal fade" id="editCompanyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header bg-primary text-white rounded-top-4">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-shield me-2"></i>কোম্পানির নাম পরিবর্তন (ওনার এক্সেস)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark">নতুন কোম্পানির নাম:</label>
+                        <input type="text" id="modalCompanyNameInput" class="form-control form-control-lg border-2" placeholder="যেমন: মা সেলস ডিস্ট্রিবিউশন">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-danger"><i class="fa-solid fa-lock me-1"></i>ওনার পাসওয়ার্ড:</label>
+                        <input type="password" id="modalOwnerPinInput" class="form-control form-control-lg border-2 border-danger" placeholder="পাসওয়ার্ড লিখুন">
+                        <small class="text-muted d-block mt-1">শুধুমাত্র ম্যানেজার অ্যাকাউন্টের পাসওয়ার্ড দিয়ে নাম পরিবর্তন করা যাবে।</small>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light rounded-bottom-4">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">বাতিল</button>
+                    <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="updateCompanyNameFromModal()">
+                        <i class="fa-solid fa-check me-1"></i> আপডেট নিশ্চিত করুন
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ইন্ডিভিজুয়াল প্রিন্ট নেওয়ার মেমো টেমপ্লেট -->
+    <div id="singleMemoPrintArea" class="d-none">
+        <div class="p-4 border border-2 border-dark rounded-3" style="max-width: 800px; margin: 0 auto; background: #fff;">
+            <div class="text-center border-bottom pb-3 mb-3">
+                <h2 class="fw-bold mb-1" id="printCompanyName">স্মার্ট হোলসেল ডিস্ট্রিবিউশন</h2>
+                <p class="mb-0 text-muted">পাইকারি ও খুচরা বিক্রেতা</p>
+                <span class="badge bg-dark fs-6 px-3 py-1 mt-2">ক্যাশ মেমো / ইনভয়েস</span>
+            </div>
+
+            <div class="row mb-3 fs-6">
+                <div class="col-6">
+                    <p class="mb-1"><strong>মেমো নং:</strong> <span id="printMemoId">#0000</span></p>
+                    <p class="mb-1"><strong>দোকানের নাম:</strong> <span id="printShopName">-</span></p>
+                    <p class="mb-0"><strong>রুট ও বাজার:</strong> <span id="printMarketName">-</span></p>
+                </div>
+                <div class="col-6 text-end">
+                    <p class="mb-1"><strong>তারিখ:</strong> <span id="printMemoDate">-</span></p>
+                    <p class="mb-0"><strong>এসআর নাম:</strong> <span id="printSrName">-</span></p>
+                </div>
+            </div>
+
+            <table class="table table-bordered align-middle mb-3">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 50px;">ক্রমিক</th>
+                        <th>পণ্যের নাম</th>
+                        <th class="text-center">পরিমাণ</th>
+                        <th class="text-end">দর (টাকা)</th>
+                        <th class="text-end">মোট টাকা</th>
+                    </tr>
+                </thead>
+                <tbody id="printMemoItems"></tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="text-end fw-bold">সর্বমোট বিল:</td>
+                        <td class="text-end fw-bold fs-5" id="printMemoTotal">৳ ০</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div class="d-flex justify-content-between mt-5 pt-4">
+                <div class="text-center border-top border-dark px-3 pt-1" style="width: 180px;">
+                    <small class="fw-bold">ক্রেতার স্বাক্ষর</small>
+                </div>
+                <div class="text-center border-top border-dark px-3 pt-1" style="width: 180px;">
+                    <small class="fw-bold">বিক্রেতার/SR স্বাক্ষর</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>
