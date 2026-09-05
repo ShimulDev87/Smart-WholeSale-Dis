@@ -801,25 +801,21 @@ function handleManagerCreateSR(event) {
 }
 
 // ==========================================
-// ২. ক্লাউডে সেভ করার ফিক্সড ফাংশন (সংশোধিত)
+// ২. ক্লাউডে সেভ করার সঠিক ফাংশন
 // ==========================================
 function saveSRToCloud(srData) {
-    // ফায়ারবেজ কানেক্টেড থাকলে ক্লাউডে পুশ করবে
     if (typeof db !== 'undefined' && db) {
         const keyId = srData.id || srData.srId;
         db.ref('srs/' + keyId).set(srData)
             .then(() => console.log("✅ SR অ্যাকাউন্ট ক্লাউডে সফলভাবে সেভ হয়েছে!"))
             .catch((err) => console.error("❌ Cloud Save Error:", err));
-    } else {
-        console.warn("⚠️ Firebase DB রেডি নেই, ডাটা ক্লাউডে সেভ হয়নি।");
     }
 }
 
 // ==========================================
-// ৩. অন্য ডিভাইস থেকে অটো-সিঙ্ক হওয়ার ফিক্সড ফাংশন (সংশোধিত)
+// ৩. অন্য ডিভাইস থেকে অটো-সিঙ্ক হওয়ার সঠিক ফাংশন
 // ==========================================
 function syncSRsFromCloud() {
-    // ফায়ারবেজ না থাকলে স্কিপ করবে
     if (typeof db === 'undefined' || !db) return;
 
     db.ref('srs').on('value', (snapshot) => {
@@ -827,7 +823,6 @@ function syncSRsFromCloud() {
         if (data) {
             const srList = Object.values(data);
             
-            // ১. Local State ও Storage সিঙ্ক
             if (typeof state !== 'undefined') {
                 state.srs = srList;
                 if (typeof saveDataToLocalStorage === 'function') saveDataToLocalStorage();
@@ -836,12 +831,10 @@ function syncSRsFromCloud() {
             localStorage.setItem('app_sr_accounts', JSON.stringify(srList));
             localStorage.setItem('srAccounts', JSON.stringify(srList));
             
-            // ২. ম্যানেজার প্যানেলের SR টেবিল রিয়েল-টাইমে রিফ্রেশ
             if (typeof renderSRListTable === 'function') renderSRListTable();
         }
     });
 }
-
 // অ্যাপ লোড হওয়ার সময় ফায়ারবেজ লিস্টেনার অন হবে
 document.addEventListener('DOMContentLoaded', () => {
     syncSRsFromCloud();
