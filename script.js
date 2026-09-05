@@ -44,21 +44,25 @@ function loadDataFromLocalStorage() {
     }
 }
 // ==========================================
-// 3. FIREBASE AUTH
+// ১. নির্ভুল ফায়ারবেজ কনফিগারেশন
 // ==========================================
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyD3-W9Y-2w3ZdnsHjgc0qo6Hl_i2fMiv6I",
-  authDomain: "smart-wholesale.firebaseapp.com",
-  projectId: "smart-wholesale",
-  storageBucket: "smart-wholesale.firebasestorage.app",
-  messagingSenderId: "449335656306",
-  appId: "1:449335656306:web:cc1dbc1cdfaafbc488a7eb",
-  measurementId: "G-1YS0NF32LT"
+    apiKey: "AIzaSyD3-W9Y-2w3ZdnsHjgc0qo6Hl_i2fMiv6I",
+    authDomain: "smart-wholesale.firebaseapp.com",
+    // Realtime Database-এর জন্য এই লাইনটি আবশ্যক:
+    databaseURL: "https://smart-wholesale-default-rtdb.firebaseio.com", 
+    projectId: "smart-wholesale",
+    storageBucket: "smart-wholesale.firebasestorage.app",
+    messagingSenderId: "449335656306",
+    appId: "1:449335656306:web:cc1dbc1cdfaafbc488a7eb",
+    measurementId: "G-1YS0NF32LT"
 };
 
+// ==========================================
+// ২. ফায়ারবেজ ইনিশিয়ালাইজেশন (Auth + Database)
+// ==========================================
 let auth = null;
-let db = null; // ডাটাবেজ ভ্যারিয়েবল
+let db = null;
 
 if (typeof firebase !== 'undefined') {
     try {
@@ -67,7 +71,10 @@ if (typeof firebase !== 'undefined') {
         }
         auth = firebase.auth();
         db = firebase.database(); // ফায়ারবেজ ডাটাবেজ অন করা হলো
-    } catch (e) { console.warn("Firebase Init Warning:", e.message); }
+        console.log("✅ Firebase Database সফলভাবে কানেক্ট হয়েছে!");
+    } catch (e) {
+        console.error("Firebase Init Error:", e.message);
+    }
 }
 
 function openAuthModal() { showModal('userAuthModal'); }
@@ -798,7 +805,7 @@ function handleManagerCreateSR(event) {
 // ==========================================
 function saveSRToCloud(srData) {
     // ফায়ারবেজ কানেক্টেড থাকলে ক্লাউডে পুশ করবে
-    if (db && firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+    if (db && firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== "AIzaSyD3-W9Y-2w3ZdnsHjgc0qo6Hl_i2fMiv6I") {
         const keyId = srData.id || srData.srId;
         db.ref('srs/' + keyId).set(srData)
             .then(() => console.log("SR অ্যাকাউন্ট ক্লাউডে সফলভাবে সেভ হয়েছে!"))
@@ -811,7 +818,7 @@ function saveSRToCloud(srData) {
 // ==========================================
 function syncSRsFromCloud() {
     // ফায়ারবেজ না থাকলে স্কিপ করবে
-    if (!db || !firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") return;
+    if (!db || !firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "AIzaSyD3-W9Y-2w3ZdnsHjgc0qo6Hl_i2fMiv6I") return;
 
     db.ref('srs').on('value', (snapshot) => {
         const data = snapshot.val();
@@ -898,39 +905,94 @@ function switchToSRView() {
 
 // পাসওয়ার্ড ছাড়াই শুধুমাত্র SR ID দিয়ে সরাসরি প্রবেশ
 // LocalStorage ব্যবহার করে পাসওয়ার্ড ছাড়া সরাসরি SR Login
-function handleSRLogin(event) {
-    event.preventDefault();
+// ==========================================
+// স্মার্ট এসআর লগইন (সব ডিভাইস ও ফায়ারবেজ সামঞ্জস্যপূর্ণ)
+// ==========================================
+async function handleSRLogin(event) {
+    if (event) event.preventDefault(); // পেইজ রিলোড হওয়া আটকানো
 
-    // ইনপুট ফিল্ড থেকে SR ID বা ফোন নম্বর নেওয়া
-    const srInput = document.getElementById('loginSrId') || document.getElementById('loginSrPhone');
-    const inputId = srInput ? srInput.value.trim() : '';
+    const inputElem = document.getElementById('loginSrId');
+    let userSrId = inputElem ? inputElem.value.trim() : '';
 
-    if (!inputId) {
-        alert('অনুগ্রহ করে এসআর আইডি বা ফোন নম্বর লিখুন!');
-        return;
+    if (!userSrId) return alert("দয়া করে এসআর আইডি লিখুন!");
+
+    // ১. আইডি ফরম্যাট ঠিক করা (যেমন: 6811 লিখলে অটো SR-6811 বানিয়ে নেওয়া)
+    userSrId = userSrId.toUpperCase();
+    if (!userSrId.startsWith('SR-') && !isNaN(userSrId)) {
+        userSrId = 'SR-' + userSrId;
     }
 
-    // ১. ম্যানেজার কর্তৃক তৈরি করা 'app_sr_accounts' থেকে লিস্ট আনা
-    const srAccounts = JSON.parse(localStorage.getItem('app_sr_accounts') || '[]');
+    let foundSR = null;
 
-    // ২. ইনপুট দেওয়া SR ID (srId) বা ফোন নম্বর দিয়ে চেক করা
-    const foundSR = srAccounts.find(sr => sr.srId === inputId || sr.phone === inputId);
+    // ২. ফায়ারবেজ থেকে সরাসরি আইডি খোঁজা
+    if (typeof db !== 'undefined' && db) {
+        try {
+            // সরাসরি আইডি নোডে চেক করা
+            const snapshot = await db.ref('srs/' + userSrId).once('value');
+            if (snapshot.exists()) {
+                foundSR = snapshot.val();
+            } else {
+                // সব SR লিস্ট থেকে ফ্লেক্সিবল চেক
+                const allSrsSnap = await db.ref('srs').once('value');
+                if (allSrsSnap.exists()) {
+                    const allData = allSrsSnap.val();
+                    foundSR = Object.values(allData).find(sr => {
+                        const sId = (sr.id || sr.srId || '').toUpperCase();
+                        return sId === userSrId || sId === userSrId.replace('SR-', '');
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Firebase Search Error:", err);
+        }
+    }
 
+    // ৩. ফায়ারবেজে না পেলে লোকাল ডাটাবেজে খোজা (Fallback)
+    if (!foundSR) {
+        const localSrs = JSON.parse(localStorage.getItem('app_sr_accounts') || '[]')
+            .concat(JSON.parse(localStorage.getItem('srAccounts') || '[]'));
+
+        foundSR = localSrs.find(sr => {
+            const sId = (sr.id || sr.srId || '').toUpperCase();
+            return sId === userSrId || sId === userSrId.replace('SR-', '');
+        });
+    }
+
+    // ৪. ফলাফল যাচাই
     if (foundSR) {
-        // ৩. অ্যাকাউন্ট খুঁজে পাওয়া গেলে activeSR হিসেবে সেভ করা
+        alert(`✅ স্বাগতম, ${foundSR.name || 'এসআর'}!\nলগইন সফল হয়েছে।`);
+
+        // একটিভ SR সেভ করা
         localStorage.setItem('activeSR', JSON.stringify(foundSR));
 
-        // ৪. লগইন মডাল বন্ধ করা
-        const modalElement = document.getElementById('srAuthModal');
-        if (modalElement) {
-            const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
-            modal.hide();
+        // নাম ও রুট অটো সিলেক্ট করা
+        const srNameInput = document.getElementById('srNameInput');
+        if (srNameInput) srNameInput.value = foundSR.name || '';
+
+        const assignedRoute = foundSR.route || foundSR.assignedRoute;
+        if (assignedRoute) {
+            const routeSelect = document.getElementById('srRouteSelect');
+            if (routeSelect) {
+                routeSelect.value = assignedRoute;
+                if (typeof onSRRouteSelect === 'function') onSRRouteSelect();
+            }
         }
 
-        // ৫. এসআর ড্যাশবোর্ডে পাঠানো
-        switchToSRView();
+        // মডাল বন্ধ করা
+        const modalElem = document.getElementById('srAuthModal');
+        if (modalElem) {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                const modalInstance = bootstrap.Modal.getInstance(modalElem) || new bootstrap.Modal(modalElem);
+                modalInstance.hide();
+            } else if (typeof hideModal === 'function') {
+                hideModal('srAuthModal');
+            }
+        }
+
+        if (typeof switchToSRView === 'function') switchToSRView();
+
     } else {
-        alert('এই আইডিটি সিস্টেমে পাওয়া যায়নি! ম্যানেজার প্রদত্ত সঠিক SR ID দিন।');
+        alert(`❌ ভুল এসআর আইডি: "${userSrId}"\nকোনো ডাটা পাওয়া যায়নি। অনুগ্রহ করে আইডিনম্বরটি আবার নিশ্চিত করুন।`);
     }
 }
 
