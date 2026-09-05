@@ -954,7 +954,7 @@ async function handleSRLogin(event) {
     }
 
     // ৪. ফলাফল যাচাই
-   // ৪. ফলাফল যাচাই ও ইউআই আপডেট
+   // ৪. ফলাফল যাচাই ও অটো-ড্রপডাউন অপশন তৈরি
     if (foundSR) {
         alert(`✅ স্বাগতম, ${foundSR.name || 'এসআর'}!\nলগইন সফল হয়েছে।`);
 
@@ -968,27 +968,33 @@ async function handleSRLogin(event) {
         const assignedRoute = foundSR.route || foundSR.assignedRoute;
         const assignedBazar = foundSR.bazar || foundSR.assignedBazar;
 
-        // ১. রুট সিলেক্ট করা
+        // ১. রুট সিলেক্ট করা (ড্রপডাউনে না থাকলে অটো তৈরি করবে)
         const routeSelect = document.getElementById('srRouteSelect');
         if (routeSelect && assignedRoute) {
-            routeSelect.value = assignedRoute;
-            
-            // রুট চেঞ্জ হলে বাজার লোড করার ফাংশন কল
-            if (typeof onSRRouteSelect === 'function') {
-                onSRRouteSelect();
+            let hasOption = Array.from(routeSelect.options).some(opt => opt.value === assignedRoute);
+            if (!hasOption) {
+                const newOpt = document.createElement('option');
+                newOpt.value = assignedRoute;
+                newOpt.textContent = assignedRoute;
+                routeSelect.appendChild(newOpt);
             }
+            routeSelect.value = assignedRoute;
+            if (typeof onSRRouteSelect === 'function') onSRRouteSelect();
         }
 
-        // ২. বাজার সিলেক্ট করা (রুট লোড হওয়ার সামান্য পর)
-        setTimeout(() => {
-            const bazarSelect = document.getElementById('srBazarSelect');
-            if (bazarSelect && assignedBazar) {
-                bazarSelect.value = assignedBazar;
-                if (typeof onSRBazarSelect === 'function') {
-                    onSRBazarSelect();
-                }
+        // ২. বাজার সিলেক্ট করা (ড্রপডাউনে না থাকলে অটো তৈরি করবে)
+        const bazarSelect = document.getElementById('srBazarSelect');
+        if (bazarSelect && assignedBazar) {
+            let hasOption = Array.from(bazarSelect.options).some(opt => opt.value === assignedBazar);
+            if (!hasOption) {
+                const newOpt = document.createElement('option');
+                newOpt.value = assignedBazar;
+                newOpt.textContent = assignedBazar;
+                bazarSelect.appendChild(newOpt);
             }
-        }, 150);
+            bazarSelect.value = assignedBazar;
+            if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
+        }
 
         // মডাল বন্ধ করা
         const modalElem = document.getElementById('srAuthModal');
