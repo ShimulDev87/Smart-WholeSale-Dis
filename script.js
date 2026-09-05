@@ -954,24 +954,41 @@ async function handleSRLogin(event) {
     }
 
     // ৪. ফলাফল যাচাই
+   // ৪. ফলাফল যাচাই ও ইউআই আপডেট
     if (foundSR) {
         alert(`✅ স্বাগতম, ${foundSR.name || 'এসআর'}!\nলগইন সফল হয়েছে।`);
 
         // একটিভ SR সেভ করা
         localStorage.setItem('activeSR', JSON.stringify(foundSR));
 
-        // নাম ও রুট অটো সিলেক্ট করা
+        // নাম বসানো
         const srNameInput = document.getElementById('srNameInput');
         if (srNameInput) srNameInput.value = foundSR.name || '';
 
         const assignedRoute = foundSR.route || foundSR.assignedRoute;
-        if (assignedRoute) {
-            const routeSelect = document.getElementById('srRouteSelect');
-            if (routeSelect) {
-                routeSelect.value = assignedRoute;
-                if (typeof onSRRouteSelect === 'function') onSRRouteSelect();
+        const assignedBazar = foundSR.bazar || foundSR.assignedBazar;
+
+        // ১. রুট সিলেক্ট করা
+        const routeSelect = document.getElementById('srRouteSelect');
+        if (routeSelect && assignedRoute) {
+            routeSelect.value = assignedRoute;
+            
+            // রুট চেঞ্জ হলে বাজার লোড করার ফাংশন কল
+            if (typeof onSRRouteSelect === 'function') {
+                onSRRouteSelect();
             }
         }
+
+        // ২. বাজার সিলেক্ট করা (রুট লোড হওয়ার সামান্য পর)
+        setTimeout(() => {
+            const bazarSelect = document.getElementById('srBazarSelect');
+            if (bazarSelect && assignedBazar) {
+                bazarSelect.value = assignedBazar;
+                if (typeof onSRBazarSelect === 'function') {
+                    onSRBazarSelect();
+                }
+            }
+        }, 150);
 
         // মডাল বন্ধ করা
         const modalElem = document.getElementById('srAuthModal');
@@ -987,9 +1004,35 @@ async function handleSRLogin(event) {
         if (typeof switchToSRView === 'function') switchToSRView();
 
     } else {
-        alert(`❌ ভুল এসআর আইডি: "${userSrId}"\nকোনো ডাটা পাওয়া যায়নি। অনুগ্রহ করে আইডিনম্বরটি আবার নিশ্চিত করুন।`);
+        alert(`❌ ভুল এসআর আইডি: "${userSrId}"\nকোনো ডাটা পাওয়া যায়নি।`);
     }
 }
+
+// রুট, বাজার ও দোকানের ডাটা ফায়ারবেজে সিঙ্ক করার ফাংশন
+function syncMasterDataFromCloud() {
+    if (typeof db === 'undefined' || !db) return;
+
+    // ১. রুট সিঙ্ক
+    db.ref('routes').on('value', (snap) => {
+        if (snap.exists()) localStorage.setItem('routes', JSON.stringify(snap.val()));
+    });
+
+    // ২. বাজার সিঙ্ক
+    db.ref('bazars').on('value', (snap) => {
+        if (snap.exists()) localStorage.setItem('bazars', JSON.stringify(snap.val()));
+    });
+
+    // ৩. দোকান সিঙ্ক
+    db.ref('shops').on('value', (snap) => {
+        if (snap.exists()) localStorage.setItem('shops', JSON.stringify(snap.val()));
+    });
+}
+
+// অ্যাপ লোড হওয়ার সময় কল হবে
+document.addEventListener('DOMContentLoaded', () => {
+    syncSRsFromCloud();
+    syncMasterDataFromCloud();
+});
 
 function loadSRProfileIntoPanel() {
     const activeSR = localStorage.getItem('activeSR');
