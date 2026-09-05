@@ -899,19 +899,18 @@ function switchToSRView() {
 }
 
 // পাসওয়ার্ড ছাড়াই শুধুমাত্র SR ID দিয়ে সরাসরি প্রবেশ
-// LocalStorage ব্যবহার করে পাসওয়ার্ড ছাড়া সরাসরি SR Login
 // ==========================================
-// স্মার্ট এসআর লগইন (সব ডিভাইস ও ফায়ারবেজ সামঞ্জস্যপূর্ণ)
+// স্মার্ট এসআর লগইন (সব ডিভাইস ও ফায়ারবেজ সামঞ্জস্যপূর্ণ)
 // ==========================================
 async function handleSRLogin(event) {
-    if (event) event.preventDefault(); // পেইজ রিলোড হওয়া আটকানো
+    if (event) event.preventDefault(); // পেইজ রিলোড হওয়া আটকানো
 
     const inputElem = document.getElementById('loginSrId');
     let userSrId = inputElem ? inputElem.value.trim() : '';
 
     if (!userSrId) return alert("দয়া করে এসআর আইডি লিখুন!");
 
-    // ১. আইডি ফরম্যাট ঠিক করা (যেমন: 6811 লিখলে অটো SR-6811 বানিয়ে নেওয়া)
+    // ১. আইডি ফরম্যাট ঠিক করা (যেমন: 6811 লিখলে অটো SR-6811 বানিয়ে নেওয়া)
     userSrId = userSrId.toUpperCase();
     if (!userSrId.startsWith('SR-') && !isNaN(userSrId)) {
         userSrId = 'SR-' + userSrId;
@@ -922,12 +921,10 @@ async function handleSRLogin(event) {
     // ২. ফায়ারবেজ থেকে সরাসরি আইডি খোঁজা
     if (typeof db !== 'undefined' && db) {
         try {
-            // সরাসরি আইডি নোডে চেক করা
             const snapshot = await db.ref('srs/' + userSrId).once('value');
             if (snapshot.exists()) {
                 foundSR = snapshot.val();
             } else {
-                // সব SR লিস্ট থেকে ফ্লেক্সিবল চেক
                 const allSrsSnap = await db.ref('srs').once('value');
                 if (allSrsSnap.exists()) {
                     const allData = allSrsSnap.val();
@@ -942,7 +939,7 @@ async function handleSRLogin(event) {
         }
     }
 
-    // ৩. ফায়ারবেজে না পেলে লোকাল ডাটাবেজে খোজা (Fallback)
+    // ৩. ফায়ারবেজে না পেলে লোকাল ডাটাবেজে খোঁজা (Fallback)
     if (!foundSR) {
         const localSrs = JSON.parse(localStorage.getItem('app_sr_accounts') || '[]')
             .concat(JSON.parse(localStorage.getItem('srAccounts') || '[]'));
@@ -953,8 +950,7 @@ async function handleSRLogin(event) {
         });
     }
 
-    // ৪. ফলাফল যাচাই
-   // ৪. ফলাফল যাচাই ও অটো-ড্রপডাউন অপশন তৈরি
+    // ৪. ফলাফল যাচাই ও অটো-ড্রপডাউন অপশন তৈরি
     if (foundSR) {
         alert(`✅ স্বাগতম, ${foundSR.name || 'এসআর'}!\nলগইন সফল হয়েছে।`);
 
@@ -979,22 +975,28 @@ async function handleSRLogin(event) {
                 routeSelect.appendChild(newOpt);
             }
             routeSelect.value = assignedRoute;
-            if (typeof onSRRouteSelect === 'function') onSRRouteSelect();
+
+            // রুট সিলেক্টের ইভেন্ট ট্রিগার
+            if (typeof onSRRouteSelect === 'function') {
+                onSRRouteSelect();
+            }
         }
 
-        // ২. বাজার সিলেক্ট করা (ড্রপডাউনে না থাকলে অটো তৈরি করবে)
-        const bazarSelect = document.getElementById('srBazarSelect');
-        if (bazarSelect && assignedBazar) {
-            let hasOption = Array.from(bazarSelect.options).some(opt => opt.value === assignedBazar);
-            if (!hasOption) {
-                const newOpt = document.createElement('option');
-                newOpt.value = assignedBazar;
-                newOpt.textContent = assignedBazar;
-                bazarSelect.appendChild(newOpt);
+        // ২. বাজার সিলেক্ট করা (রুট সিলেক্টের রিসেট প্রসেস শেষ হতে ১৫০ms সময় দেওয়া)
+        setTimeout(() => {
+            const bazarSelect = document.getElementById('srBazarSelect');
+            if (bazarSelect && assignedBazar) {
+                let hasOption = Array.from(bazarSelect.options).some(opt => opt.value === assignedBazar);
+                if (!hasOption) {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = assignedBazar;
+                    newOpt.textContent = assignedBazar;
+                    bazarSelect.appendChild(newOpt);
+                }
+                bazarSelect.value = assignedBazar;
+                if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
             }
-            bazarSelect.value = assignedBazar;
-            if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
-        }
+        }, 150);
 
         // মডাল বন্ধ করা
         const modalElem = document.getElementById('srAuthModal');
@@ -1014,29 +1016,42 @@ async function handleSRLogin(event) {
     }
 }
 
-// রুট, বাজার ও দোকানের ডাটা ফায়ারবেজে সিঙ্ক করার ফাংশন
+// রুট, বাজার ও দোকানের ডাটা ফায়ারবেজ থেকে সিঙ্ক এবং UI আপডেট করার ফাংশন
 function syncMasterDataFromCloud() {
     if (typeof db === 'undefined' || !db) return;
 
     // ১. রুট সিঙ্ক
     db.ref('routes').on('value', (snap) => {
-        if (snap.exists()) localStorage.setItem('routes', JSON.stringify(snap.val()));
+        if (snap.exists()) {
+            const routesData = snap.val();
+            localStorage.setItem('routes', JSON.stringify(routesData));
+            if (typeof state !== 'undefined') state.routes = routesData;
+            if (typeof renderRouteDropdowns === 'function') renderRouteDropdowns();
+        }
     });
 
     // ২. বাজার সিঙ্ক
     db.ref('bazars').on('value', (snap) => {
-        if (snap.exists()) localStorage.setItem('bazars', JSON.stringify(snap.val()));
+        if (snap.exists()) {
+            const bazarsData = snap.val();
+            localStorage.setItem('bazars', JSON.stringify(bazarsData));
+            if (typeof state !== 'undefined') state.bazars = bazarsData;
+        }
     });
 
     // ৩. দোকান সিঙ্ক
     db.ref('shops').on('value', (snap) => {
-        if (snap.exists()) localStorage.setItem('shops', JSON.stringify(snap.val()));
+        if (snap.exists()) {
+            const shopsData = snap.val();
+            localStorage.setItem('shops', JSON.stringify(shopsData));
+            if (typeof state !== 'undefined') state.shops = shopsData;
+        }
     });
 }
 
-// অ্যাপ লোড হওয়ার সময় কল হবে
+// অ্যাপ লোড হওয়ার সময় কল হবে
 document.addEventListener('DOMContentLoaded', () => {
-    syncSRsFromCloud();
+    if (typeof syncSRsFromCloud === 'function') syncSRsFromCloud();
     syncMasterDataFromCloud();
 });
 
