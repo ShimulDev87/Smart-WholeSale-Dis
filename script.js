@@ -1163,6 +1163,17 @@ function getRouteDataSafely(routeVal) {
 }
 
 // ==========================================
+// রুট, বাজার ও দোকান ফায়ারবেজে আপলোড করার ফাংশন
+// ==========================================
+function saveRoutesToCloud() {
+    if (typeof db !== 'undefined' && db && routesData) {
+        db.ref('routesData').set(routesData)
+            .then(() => console.log("✅ সকল রুট ও দোকান ফায়ারবেজে সফলভাবে আপলোড হয়েছে!"))
+            .catch(err => console.error("❌ Cloud Save Error:", err));
+    }
+}
+
+// ==========================================
 // ২. রুট সিলেক্ট ফাংশন (উন্নত সংস্করণ)
 // ==========================================
 function onSRRouteSelect() {
@@ -1305,6 +1316,61 @@ function onSRBazarSelect() {
         }
     }
     gridContainer.innerHTML = html;
+}
+
+function addRoute() {
+    const routeInput = document.getElementById('newRouteInput');
+    const routeName = routeInput ? routeInput.value.trim() : '';
+    if (!routeName) return alert("রুটের নাম লিখুন!");
+
+    if (!routesData[routeName]) {
+        routesData[routeName] = { bazars: [], shops: {} };
+        alert(`'${routeName}' সফলভাবে যুক্ত হয়েছে!`);
+        if (routeInput) routeInput.value = '';
+        saveDataToLocalStorage();
+        saveRoutesToCloud(); // <-- ফায়ারবেজে সেভ হচ্ছে
+        updateRouteDropdowns();
+        updateSrSetupRouteDropdown();
+    } else {
+        alert("এই রুটটি আগেই তৈরি করা আছে!");
+    }
+}
+
+function saveBazarAndShops() {
+    if (!currentRoute) return alert("দয়া করে রুট নির্বাচন করুন!");
+    saveCurrentShopInputs();
+    saveDataToLocalStorage();
+    saveRoutesToCloud(); // <-- সকল বাজার ও দোকান ফায়ারবেজে সেভ হচ্ছে
+    alert(`'${currentRoute}' রুটের সকল বাজার ও দোকান সফলভাবে সেভ করা হয়েছে!`);
+}
+
+
+// ==========================================
+// অন্য যেকোনো ডিভাইসে লাইভ রুট ও দোকান সিঙ্ক হওয়ার ফাংশন
+// ==========================================
+function syncMasterDataFromCloud() {
+    if (typeof db === 'undefined' || !db) return;
+
+    db.ref('routesData').on('value', (snap) => {
+        if (snap.exists()) {
+            routesData = snap.val() || {};
+            localStorage.setItem('routesData', JSON.stringify(routesData));
+            
+            // ড্রপডাউন রিফ্রেশ
+            if (typeof updateRouteDropdowns === 'function') updateRouteDropdowns();
+            if (typeof populateSRRoutes === 'function') populateSRRoutes();
+
+            // এসআর প্যানেল খোলা থাকলে লাইভ আপডেট
+            const srRoute = document.getElementById('srRouteSelect');
+            if (srRoute && srRoute.value) {
+                if (typeof onSRRouteSelect === 'function') onSRRouteSelect();
+                const srBazar = document.getElementById('srBazarSelect');
+                if (srBazar && srBazar.value !== "") {
+                    if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
+                }
+            }
+        }
+    });
 }
 
 
