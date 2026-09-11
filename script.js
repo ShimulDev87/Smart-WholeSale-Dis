@@ -300,6 +300,46 @@ function applyOwnerConfig(owner) {
     localStorage.setItem('selectedCategories', JSON.stringify(owner.categories || []));
     syncCategoriesGlobally(owner.categories || []);
     saveDataToLocalStorage();
+
+    // 🆕 ফায়ারবেজ ক্লাউডে কোম্পানির তথ্য সেভ করা
+    if (typeof database !== 'undefined') {
+        database.ref('companyInfo').set({
+            companyName: owner.companyName,
+            ownerName: owner.ownerName || '',
+            phone: owner.phone || '',
+            categories: owner.categories || [],
+            updatedAt: new Date().toISOString()
+        }).then(() => {
+            console.log("✅ কোম্পানির তথ্য ফায়ারবেজে আপলোড হয়েছে!");
+        }).catch(err => {
+            console.error("❌ কোম্পানির তথ্য ফায়ারবেজে পাঠাতে সমস্যা:", err);
+        });
+    }
+}
+
+// 🆕 ফায়ারবেজ থেকে রিয়েলটাইমে কোম্পানির নাম ও ক্যাটাগরি পড়ার ফাংশন
+function syncCompanyInfoFromCloud() {
+    if (typeof database === 'undefined') return;
+
+    database.ref('companyInfo').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.companyName) {
+            // Local State এবং Storage আপডেট
+            state.companyName = data.companyName;
+            localStorage.setItem('companyName', data.companyName);
+
+            // ক্যাটাগরি আপডেট
+            if (data.categories) {
+                localStorage.setItem('selectedCategories', JSON.stringify(data.categories));
+                if (typeof syncCategoriesGlobally === 'function') {
+                    syncCategoriesGlobally(data.categories);
+                }
+            }
+
+            // UI-তে কোম্পানির নাম দেখানো
+            syncCompanyNameToUI(data.companyName);
+        }
+    });
 }
 
 function syncCompanyNameToUI(name) {
@@ -1838,7 +1878,6 @@ function syncOrdersFromCloud() {
 document.addEventListener('DOMContentLoaded', () => {
     loadDataFromLocalStorage();
     initializeDefaultProducts();
-   
 
     const owner = getOwnerProfile();
     if (owner) {
@@ -1846,6 +1885,12 @@ document.addEventListener('DOMContentLoaded', () => {
         syncCompanyNameToUI(owner.companyName);
         syncCategoriesGlobally(owner.categories || []);
     } else {
+        // 🆕 যদি অনার প্রফাইল না থাকে (যেমন: এসআর ডিভাইসে), লোকাল স্টোরেজের সেভ থাকা নাম দেখাবে
+        const savedCompanyName = localStorage.getItem('companyName');
+        if (savedCompanyName) {
+            state.companyName = savedCompanyName;
+            syncCompanyNameToUI(savedCompanyName);
+        }
         syncCategoriesGlobally(ALL_BUSINESS_CATEGORIES);
     }
 
@@ -1855,6 +1900,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof syncSRsFromCloud === 'function') syncSRsFromCloud();
     if (typeof syncMasterDataFromCloud === 'function') syncMasterDataFromCloud();
     if (typeof syncOrdersFromCloud === 'function') syncOrdersFromCloud();
+    
+    // 🆕 ক্লাউড থেকে কোম্পানির নাম ও ক্যাটাগরি সিঙ্ক করার লিসেনার
+    if (typeof syncCompanyInfoFromCloud === 'function') syncCompanyInfoFromCloud();
 
     // সার্ভিস ওয়ার্কার রেজিস্টার (PWA support)
     if ('serviceWorker' in navigator) {
