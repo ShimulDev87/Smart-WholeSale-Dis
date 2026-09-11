@@ -1554,6 +1554,20 @@ function updateCartUI() {
     if (cartTotalElem) cartTotalElem.innerText = total;
 }
 
+
+// ==========================================
+// অর্ডার/মেমো ফায়ারবেজ ক্লাউডে সেভ করার ফাংশন
+// ==========================================
+function saveOrderToCloud(orderData) {
+    if (typeof db !== 'undefined' && db && orderData) {
+        db.ref('orders/' + orderData.id).set(orderData)
+            .then(() => console.log("✅ অর্ডার ক্লাউডে সফলভাবে সেভ হয়েছে!"))
+            .catch(err => console.error("❌ Order Cloud Save Error:", err));
+    }
+}
+
+
+
 // ==========================================
 // ১. আপডেট করা submitOrder (টাইমজোন ও তারিখ ফিক্সড)
 // ==========================================
@@ -1571,7 +1585,6 @@ function submitOrder() {
     const now = new Date();
     const orderTime = now.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
     
-    // তারিখ ঠিকভাবে প্রসেস করা (টাইমজোন বাগ ফিক্স)
     const dateInputValue = document.getElementById('orderDateInput')?.value;
     let targetDate = new Date();
     
@@ -1604,7 +1617,12 @@ function submitOrder() {
     if (!Array.isArray(state.orders)) state.orders = [];
     state.orders.push(newOrder);
 
+    // ১. লোকাল স্টোরেজ সেভ
     saveDataToLocalStorage();
+
+    // ২. ফায়ারবেজ ক্লাউড ডাটাবেজে সেভ (অন্যান্য ডিভাইসে পাঠানোর জন্য)
+    saveOrderToCloud(newOrder);
+
     generateDailySummary();
     renderMemoList();
 
@@ -1625,6 +1643,7 @@ function submitOrder() {
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     }
 }
+
 // ==========================================
 // ০. বাংলা সংখ্যাকে ইংরেজিতে রূপান্তরের হেলপার ফাংশন
 // ==========================================
@@ -1837,6 +1856,31 @@ function renderMemoList() {
         });
     } catch (e) { console.error("Memo List Error: ", e); }
 }
+
+// ==========================================
+// সকল ডিভাইস থেকে আসা অর্ডার লাইভ সিঙ্ক করার ফাংশন
+// ==========================================
+function syncOrdersFromCloud() {
+    if (typeof db === 'undefined' || !db) return;
+
+    db.ref('orders').on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            const rawOrders = snapshot.val();
+            const orderList = Object.values(rawOrders);
+
+            if (typeof state !== 'undefined') {
+                state.orders = orderList;
+                localStorage.setItem('orders', JSON.stringify(orderList));
+
+                // ম্যানেজার প্যানেলের মেমো ও সামারি অটো আপডেট
+                if (typeof generateDailySummary === 'function') generateDailySummary();
+                if (typeof renderMemoList === 'function') renderMemoList();
+            }
+        }
+    });
+}
+
+
 // ==========================================
 // 13. APP INITIALIZATION
 // ==========================================
@@ -1854,6 +1898,14 @@ document.addEventListener('DOMContentLoaded', () => {
         syncCategoriesGlobally(ALL_BUSINESS_CATEGORIES);
     }
 
+    // ==========================================
+    // ফায়ারবেজ রিয়েলটাইম ক্লাউড লিসেনার সমুহ
+    // ==========================================
+    if (typeof syncSRsFromCloud === 'function') syncSRsFromCloud();
+    if (typeof syncMasterDataFromCloud === 'function') syncMasterDataFromCloud();
+    if (typeof syncOrdersFromCloud === 'function') syncOrdersFromCloud();
+
+    // সার্ভিস ওয়ার্কার রেজিস্টার (PWA support)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
             .catch(err => console.log('Service Worker Warning:', err));
