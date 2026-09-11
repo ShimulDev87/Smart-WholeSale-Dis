@@ -327,7 +327,7 @@ function applyOwnerConfig(owner) {
     syncCategoriesGlobally(owner.categories || []);
     if (typeof saveDataToLocalStorage === 'function') saveDataToLocalStorage();
 
-    // 🚀 ফায়ারবেজ ক্লাউডে নাম ও ক্যাটাগরি সেভ করা
+    // 🚀 ফায়ারবেজে ডাটা পাঠানো (database অথবা db অটো সিলেক্ট করবে)
     const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
     if (firebaseDb) {
         firebaseDb.ref('companyInfo').set({
@@ -335,12 +335,12 @@ function applyOwnerConfig(owner) {
             categories: owner.categories || [],
             updatedAt: new Date().toISOString()
         }).then(() => {
-            console.log("✅ ফায়ারবেজে কোম্পানির নাম ও ক্যাটাগরি সেভ হয়েছে!");
+            console.log("✅ ফায়ারবেজে কোম্পানির নাম আপলোড হয়েছে!");
         }).catch(err => {
-            console.error("❌ ফায়ারবেজ সেভ এরর:", err);
+            console.error("❌ ফায়ারবেজে সেভ হতে ব্যর্থ:", err);
         });
     } else {
-        console.warn("⚠️ Firebase Database অবজেক্ট পাওয়া যায়নি!");
+        console.error("❌ ফায়ারবেজ ডাটাবেজ অবজেক্ট পাওয়া যায়নি!");
     }
 }
 
