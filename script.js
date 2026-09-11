@@ -1838,7 +1838,7 @@ function syncOrdersFromCloud() {
 document.addEventListener('DOMContentLoaded', () => {
     loadDataFromLocalStorage();
     initializeDefaultProducts();
-    initSparkles();
+   
 
     const owner = getOwnerProfile();
     if (owner) {
