@@ -246,44 +246,52 @@ header,
 }
 
 /* ==========================================
-   6. PRINT STYLES
+   6. PRINT STYLES (UNIFIED & FIXED)
+   ========================================== */
+/* ==========================================
+   স্মার্ট ও নির্ভুল প্রিন্ট সিএসএস
+   ========================================== */
+/* ==========================================
+   নির্ভুল মেমো ও সামারি প্রিন্ট সিএসএস
    ========================================== */
 @media print {
-    body { 
-        background: #fff !important; 
-    }
-
+    /* প্রিন্ট করার সময় ওয়েবসাইট এর বাকি সব অনাকাঙ্ক্ষিত বিষয় হাইড থাকবে */
     body * {
-        visibility: hidden;
+        visibility: hidden !important;
     }
 
-    #summaryTab, #summaryTab * {
-        visibility: visible;
+    /* ১. শুধু মেমো প্রিন্টের সময় কেবল #singleMemoPrintArea দৃশ্যমান হবে */
+    body.printing-memo #singleMemoPrintArea,
+    body.printing-memo #singleMemoPrintArea * {
+        visibility: visible !important;
     }
-
-    #summaryTab {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        border: none !important;
-        box-shadow: none !important;
-    }
-
-    body.memo-printing-mode #singleMemoPrintArea, 
-    body.memo-printing-mode #singleMemoPrintArea * {
-        visibility: visible;
-    }
-
-    body.memo-printing-mode #singleMemoPrintArea {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
+    body.printing-memo #singleMemoPrintArea {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
         display: block !important;
+        margin: 0 !important;
+        padding: 10px !important;
     }
 
-    .no-print, .navbar, button {
+    /* ২. শুধু চালানের সামারি প্রিন্টের সময় কেবল #dailySummaryCard দৃশ্যমান হবে */
+    body.printing-summary #dailySummaryCard,
+    body.printing-summary #dailySummaryCard * {
+        visibility: visible !important;
+    }
+    body.printing-summary #dailySummaryCard {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        display: block !important;
+        margin: 0 !important;
+        padding: 10px !important;
+    }
+
+    /* বাটন ও নেভিগেশন হাইড */
+    .btn, button, nav, header, footer, .no-print {
         display: none !important;
     }
 }

@@ -1140,24 +1140,53 @@ function populateSRRoutes() {
 
     renderDefaultShopSlots();
 }
+// ==========================================
+// ১. স্মার্ট রুট ডাটা হেলপার (Case/Space Flexible)
+// ==========================================
+function getRouteDataSafely(routeVal) {
+    if (!routesData || !routeVal) return null;
+    
+    // ১. সরাসরি মিললে
+    if (routesData[routeVal]) return routesData[routeVal];
 
+    // ২. স্পেস বা স্মল/ক্যাপিটাল লেটারের অমিল থাকলেও খুঁজে বের করবে
+    const cleanRoute = String(routeVal).trim().toLowerCase();
+    for (let key in routesData) {
+        if (String(key).trim().toLowerCase() === cleanRoute) {
+            return routesData[key];
+        }
+        if (routesData[key] && routesData[key].name && String(routesData[key].name).trim().toLowerCase() === cleanRoute) {
+            return routesData[key];
+        }
+    }
+    return null;
+}
+
+// ==========================================
+// ২. রুট সিলেক্ট ফাংশন (উন্নত সংস্করণ)
+// ==========================================
 function onSRRouteSelect() {
     const srRoute = document.getElementById('srRouteSelect');
     const bazarSelect = document.getElementById('srBazarSelect');
     const posArea = document.getElementById('posSectionArea');
     
     if (posArea) posArea.classList.add('d-none');
-    selectedSRShop = null;
+    if (typeof selectedSRShop !== 'undefined') selectedSRShop = null;
     if (!srRoute || !bazarSelect) return;
 
     const route = srRoute.value;
     let optionsHtml = '<option value="">-- বাজার নির্বাচন করুন --</option>';
 
-    if (route && routesData[route] && Array.isArray(routesData[route].bazars)) {
-        routesData[route].bazars.forEach((bazar, index) => {
-            const bName = typeof bazar === 'string' ? bazar : (bazar ? bazar.name : '');
+    const rData = getRouteDataSafely(route);
+
+    if (rData && rData.bazars) {
+        const bazarsList = Array.isArray(rData.bazars) ? rData.bazars : Object.values(rData.bazars);
+        
+        bazarsList.forEach((bazar, index) => {
+            const bName = typeof bazar === 'string' ? bazar : (bazar ? (bazar.name || bazar.bazarName || '') : '');
             if (bName && bName.trim() !== '') {
-                optionsHtml += `<option value="${index}">${bName}</option>`;
+                // ইন্ডেক্স এবং নাম দুটোই ডাটা অ্যাট্রিবিউটে রাখা হচ্ছে সেফটির জন্য
+                optionsHtml += `<option value="${index}" data-name="${bName.trim()}">${bName.trim()}</option>`;
             }
         });
     }
@@ -1166,6 +1195,9 @@ function onSRRouteSelect() {
     renderDefaultShopSlots();
 }
 
+// ==========================================
+// ৩. বাজার সিলেক্ট ও দোকান রেন্ডার ফাংশন (উন্নত সংস্করণ)
+// ==========================================
 function onSRBazarSelect() {
     const srRoute = document.getElementById('srRouteSelect');
     const bazarSelect = document.getElementById('srBazarSelect');
@@ -1176,15 +1208,35 @@ function onSRBazarSelect() {
 
     const route = srRoute.value;
     const bIndex = bazarSelect.value;
+    
+    // সিলেক্ট করা বাজারের নাম নেওয়া
+    const selectedOption = bazarSelect.options[bazarSelect.selectedIndex];
+    const bName = selectedOption ? (selectedOption.getAttribute('data-name') || selectedOption.text.trim()) : '';
 
     if (!route || bIndex === "" || bIndex === null) { 
         renderDefaultShopSlots(); 
         return; 
     }
 
+    const rData = getRouteDataSafely(route);
     let shopList = [];
-    if (routesData[route] && routesData[route].shops) {
-        shopList = routesData[route].shops[bIndex] || [];
+
+    if (rData && rData.shops) {
+        // ডাটাবেজে দোকান যেভাবে থাকুক না কেন (ইন্ডেক্স দিয়ে বা বাজারের নাম দিয়ে) ডাটা খুঁজে বের করবে
+        if (Array.isArray(rData.shops) && rData.shops[bIndex]) {
+            shopList = rData.shops[bIndex];
+        } else if (bName && rData.shops[bName]) {
+            shopList = rData.shops[bName];
+        } else if (rData.shops[bIndex]) {
+            shopList = rData.shops[bIndex];
+        } else if (Array.isArray(rData.shops)) {
+            // ফ্ল্যাট অ্যারে ফিল্টারিং
+            shopList = rData.shops.filter(s => s && (
+                s.bazar === bName || 
+                s.market === bName || 
+                String(s.bazarIndex) === String(bIndex)
+            ));
+        }
     }
 
     const activeShops = shopList.filter(s => s && s.name && s.name.trim() !== '');
@@ -1202,14 +1254,14 @@ function onSRBazarSelect() {
         const hasShop = sName.trim() !== '';
 
         let existingOrder = null;
-        if (hasShop && state && Array.isArray(state.orders)) {
-            existingOrder = state.orders.find(o => o && o.shop === sName && o.route === route);
+        if (hasShop && typeof state !== 'undefined' && Array.isArray(state.orders)) {
+            existingOrder = state.orders.find(o => o && o.shop === sName && (o.route === route || (rData && o.route === rData.name)));
         }
         const isOrdered = !!existingOrder;
 
         if (hasShop) {
-            const ownerName = shop.owner || 'মালিকের নাম নেই';
-            const ownerPhone = shop.phone || '';
+            const ownerName = shop.owner || shop.ownerName || 'মালিকের নাম নেই';
+            const ownerPhone = shop.phone || shop.mobile || '';
             
             const statusBadge = isOrdered
                 ? `<span class="text-success fw-bold ms-1" style="font-size: 0.85rem;">(অর্ডার সম্পন্ন)</span>`
@@ -1507,9 +1559,93 @@ function submitOrder() {
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     }
 }
+// ==========================================
+// ০. বাংলা সংখ্যাকে ইংরেজিতে রূপান্তরের হেলপার ফাংশন
+// ==========================================
+function convertBnToEnNum(str) {
+    if (!str) return '';
+    const bnNums = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return str.toString().replace(/[০-৯]/g, d => bnNums.indexOf(d));
+}
 
 // ==========================================
-// ২. আপডেট করা generateDailySummary (স্মার্ট ম্যাচিং)
+// ১. সিঙ্গেল মেমো প্রিন্ট ফাংশন
+// ==========================================
+function printSingleMemo(ordId) {
+    const ord = state.orders.find(o => String(o.id) === String(ordId));
+    if (!ord) return alert('মেমো পাওয়া যায়নি!');
+
+    const setTxt = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = val;
+    };
+
+    setTxt('printMemoId', ord.id || '');
+    setTxt('printShopName', ord.shopName || ord.shop || '-');
+    setTxt('printMarketName', `${ord.route || ''} / ${ord.market || ord.bazar || ''}`);
+    setTxt('printMemoDate', `${ord.date || ''} ${ord.time || ''}`);
+    setTxt('printSrName', ord.srName || ord.sr || '-');
+
+    const itemsTbody = document.getElementById('printMemoItems');
+    if (itemsTbody) {
+        itemsTbody.innerHTML = '';
+        if (ord.items && Array.isArray(ord.items)) {
+            ord.items.forEach((item, index) => {
+                const qty = parseFloat(item.qty || item.quantity) || 0;
+                const price = parseFloat(item.price) || 0;
+                const total = qty * price;
+
+                itemsTbody.innerHTML += `
+                    <tr>
+                        <td class="text-center">${typeof toBanglaNum === 'function' ? toBanglaNum(index + 1) : index + 1}</td>
+                        <td>${item.name}</td>
+                        <td class="text-center">${typeof toBanglaNum === 'function' ? toBanglaNum(qty) : qty} ${item.displayUnit || item.unit || ''}</td>
+                        <td class="text-end">৳ ${typeof toBanglaNum === 'function' ? toBanglaNum(price.toLocaleString('en-US')) : price}</td>
+                        <td class="text-end">৳ ${typeof toBanglaNum === 'function' ? toBanglaNum(total.toLocaleString('en-US')) : total}</td>
+                    </tr>`;
+            });
+        }
+    }
+
+    const grandTotal = parseFloat(ord.totalAmount || ord.total || 0);
+    setTxt('printMemoTotal', `৳ ${typeof toBanglaNum === 'function' ? toBanglaNum(grandTotal.toLocaleString('en-US')) : grandTotal}`);
+
+    const printArea = document.getElementById('singleMemoPrintArea');
+    if (!printArea) return alert('প্রিন্ট লেআউট HTML-এ পাওয়া যায়নি (#singleMemoPrintArea)!');
+
+    // মেমো প্রিন্ট মোড চালু
+    printArea.classList.remove('d-none');
+    document.body.classList.add('printing-memo');
+
+    setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('printing-memo');
+            printArea.classList.add('d-none');
+        }, 500);
+    }, 150);
+}
+
+// ==========================================
+// ২. আজকের সামারি প্রিন্ট ফাংশন
+// ==========================================
+function printDailySummary() {
+    const summaryCard = document.getElementById('dailySummaryCard');
+    if (!summaryCard) return alert('সামারি সেকশন HTML-এ পাওয়া যায়নি (#dailySummaryCard)!');
+
+    // সামারি প্রিন্ট মোড চালু
+    document.body.classList.add('printing-summary');
+
+    setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('printing-summary');
+        }, 500);
+    }, 150);
+}
+
+// ==========================================
+// ৩. আপডেট করা generateDailySummary (স্মার্ট ম্যাচিং)
 // ==========================================
 function generateDailySummary() {
     try {
@@ -1521,16 +1657,21 @@ function generateDailySummary() {
         }
         summaryTable.innerHTML = '';
 
-        const today = new Date().toLocaleDateString('bn-BD');
-        if (document.getElementById('summaryDate')) document.getElementById('summaryDate').innerText = `তারিখ: ${today}`;
+        const todayRaw = new Date().toLocaleDateString('bn-BD');
+        if (document.getElementById('summaryDate')) document.getElementById('summaryDate').innerText = `তারিখ: ${todayRaw}`;
 
-        // তারিখ তুলনা করার জন্য জিরো রিমুভ করার হেলপার ফাংশন
-        const normalizeDate = (str) => str ? str.toString().replace(/^০+|(?<=\/)০+/g, '').trim() : '';
+        // নিখুঁত তারিখ ম্যাচিং (বাংলা সংখ্যাকে ইংরেজিতে এনে জিরো কাটবে)
+        const normalizeDate = (str) => {
+            if (!str) return '';
+            let enStr = convertBnToEnNum(str); 
+            return enStr.replace(/^0+|(?<=\/)0+/g, '').trim(); 
+        };
 
-        // আজকের তারিখের সাথে নিখুঁত ফিল্টারিং
+        const todayNormalized = normalizeDate(todayRaw);
+
         const todaysOrders = state.orders.filter(order => {
             if (!order || !order.date) return false;
-            return normalizeDate(order.date) === normalizeDate(today);
+            return normalizeDate(order.date) === todayNormalized;
         });
 
         let totalOrders = todaysOrders.length, grandTotalAmount = 0, totalItemsCount = 0;
@@ -1542,7 +1683,12 @@ function generateDailySummary() {
                 order.items.forEach(item => {
                     const itemQty = parseFloat(item.qty || item.quantity) || 0;
                     if (!productSummaryMap[item.name]) {
-                        productSummaryMap[item.name] = { category: item.category || 'সাধারণ', qty: 0, unit: item.displayUnit || item.unit || 'pcs', price: parseFloat(item.price) || 0 };
+                        productSummaryMap[item.name] = { 
+                            category: item.category || 'সাধারণ', 
+                            qty: 0, 
+                            unit: item.displayUnit || item.unit || 'pcs', 
+                            price: parseFloat(item.price) || 0 
+                        };
                     }
                     productSummaryMap[item.name].qty += itemQty;
                 });
@@ -1560,21 +1706,20 @@ function generateDailySummary() {
                 summaryTable.innerHTML += `<tr>
                     <td class="fw-bold">${name}</td>
                     <td><span class="badge bg-light text-dark border">${item.category}</span></td>
-                    <td class="fw-bold text-primary">${toBanglaNum(item.qty)} ${item.unit}</td>
-                    <td class="fw-bold text-success">৳ ${toBanglaNum(totalItemPrice.toLocaleString('en-US'))}</td>
+                    <td class="fw-bold text-primary">${typeof toBanglaNum === 'function' ? toBanglaNum(item.qty) : item.qty} ${item.unit}</td>
+                    <td class="fw-bold text-success">৳ ${typeof toBanglaNum === 'function' ? toBanglaNum(totalItemPrice.toLocaleString('en-US')) : totalItemPrice}</td>
                 </tr>`;
             });
         }
 
-        if (document.getElementById('summaryTotalOrders')) document.getElementById('summaryTotalOrders').innerText = toBanglaNum(totalOrders);
-        if (document.getElementById('summaryTotalAmount')) document.getElementById('summaryTotalAmount').innerText = `৳ ${toBanglaNum(grandTotalAmount.toLocaleString('en-US'))}`;
-        if (document.getElementById('summaryTotalItems')) document.getElementById('summaryTotalItems').innerText = `${toBanglaNum(totalItemsCount)} টি`;
+        if (document.getElementById('summaryTotalOrders')) document.getElementById('summaryTotalOrders').innerText = typeof toBanglaNum === 'function' ? toBanglaNum(totalOrders) : totalOrders;
+        if (document.getElementById('summaryTotalAmount')) document.getElementById('summaryTotalAmount').innerText = `৳ ${typeof toBanglaNum === 'function' ? toBanglaNum(grandTotalAmount.toLocaleString('en-US')) : grandTotalAmount}`;
+        if (document.getElementById('summaryTotalItems')) document.getElementById('summaryTotalItems').innerText = `${typeof toBanglaNum === 'function' ? toBanglaNum(totalItemsCount) : totalItemsCount} টি`;
     } catch (e) { console.error("Summary Error: ", e); }
 }
 
-
 // ==========================================
-// ৩. তারিখ অনুযায়ী গ্রুপ করা মেমো লিস্ট
+// ৪. তারিখ অনুযায়ী গ্রুপ করা মেমো লিস্ট
 // ==========================================
 function renderMemoList() {
     try {
@@ -1586,7 +1731,6 @@ function renderMemoList() {
         }
         memoTbody.innerHTML = '';
 
-        // ১. অর্ডারগুলোকে তারিখ অনুযায়ী গ্রুপ করা
         const groupedOrders = {};
         state.orders.forEach(ord => {
             const dateKey = ord.date || 'অন্যান্য';
@@ -1596,29 +1740,27 @@ function renderMemoList() {
             groupedOrders[dateKey].push(ord);
         });
 
-        // ২. প্রতিটি তারিখের জন্য আলাদা সেকশন বানিয়ে রেন্ডার করা
         Object.keys(groupedOrders).reverse().forEach(date => {
             const ordersInDate = groupedOrders[date];
             const dayName = ordersInDate[0]?.dayName ? ` - ${ordersInDate[0].dayName}` : '';
 
-            // তারিখের হেডার রো (Header Row)
             memoTbody.innerHTML += `
                 <tr class="table-dark text-white fw-bold">
                     <td colspan="6" class="py-2 px-3">
                         <i class="fa-solid fa-calendar-days me-2 text-warning"></i>তারিখ: ${date}${dayName} 
-                        <span class="badge bg-warning text-dark ms-2">${toBanglaNum(ordersInDate.length)} টি মেমো</span>
+                        <span class="badge bg-warning text-dark ms-2">${typeof toBanglaNum === 'function' ? toBanglaNum(ordersInDate.length) : ordersInDate.length} টি মেমো</span>
                     </td>
                 </tr>`;
 
-            // ওই তারিখের সমস্ত মেমো রেন্ডার করা
             ordersInDate.forEach((ord, idx) => {
+                const totalAmt = parseFloat(ord.totalAmount || ord.total || 0);
                 memoTbody.innerHTML += `
                     <tr>
                         <td><span class="badge bg-primary">#${ord.id || (idx + 1001)}</span></td>
                         <td>${ord.time || '-'}</td>
                         <td><strong>${ord.srName || ord.sr || 'এসআর'}</strong></td>
                         <td>${ord.shopName || ord.shop || '-'} (${ord.market || ord.bazar || '-'})</td>
-                        <td class="fw-bold text-success">৳ ${ord.totalAmount || ord.total || 0}</td>
+                        <td class="fw-bold text-success">৳ ${typeof toBanglaNum === 'function' ? toBanglaNum(totalAmt.toLocaleString('en-US')) : totalAmt}</td>
                         <td class="text-center">
                             <button class="btn btn-sm btn-outline-dark" onclick="printSingleMemo('${ord.id}')">
                                 <i class="fa-solid fa-print me-1"></i>প্রিন্ট
@@ -1629,41 +1771,6 @@ function renderMemoList() {
         });
     } catch (e) { console.error("Memo List Error: ", e); }
 }
-
-function printSingleMemo(ordId) {
-    const ord = state.orders.find(o => o.id === ordId);
-    if (!ord) return alert('মেমো পাওয়া যায়নি!');
-
-    document.getElementById('printMemoId').innerText = ord.id;
-    document.getElementById('printShopName').innerText = ord.shopName || ord.shop || '-';
-    document.getElementById('printMarketName').innerText = `${ord.route || ''} / ${ord.market || ord.bazar || ''}`;
-    document.getElementById('printMemoDate').innerText = `${ord.date || ''} ${ord.time || ''}`;
-    document.getElementById('printSrName').innerText = ord.srName || ord.sr || '-';
-
-    const itemsTbody = document.getElementById('printMemoItems');
-    itemsTbody.innerHTML = '';
-    if (ord.items && Array.isArray(ord.items)) {
-        ord.items.forEach((item, index) => {
-            itemsTbody.innerHTML += `
-                <tr>
-                    <td class="text-center">${index + 1}</td>
-                    <td>${item.name}</td>
-                    <td class="text-center">${item.qty} ${item.displayUnit || item.unit || ''}</td>
-                    <td class="text-end">৳${item.price}</td>
-                    <td class="text-end">৳${item.price * item.qty}</td>
-                </tr>`;
-        });
-    }
-    document.getElementById('printMemoTotal').innerText = `৳ ${ord.totalAmount || ord.total || 0}`;
-
-    const printArea = document.getElementById('singleMemoPrintArea');
-    if (printArea) {
-        printArea.classList.remove('d-none');
-        window.print();
-        printArea.classList.add('d-none');
-    }
-}
-
 // ==========================================
 // 13. APP INITIALIZATION
 // ==========================================
