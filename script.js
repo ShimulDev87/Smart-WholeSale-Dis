@@ -1146,10 +1146,10 @@ function populateSRRoutes() {
 function getRouteDataSafely(routeVal) {
     if (!routesData || !routeVal) return null;
     
-    // ১. সরাসরি মিললে
+    
     if (routesData[routeVal]) return routesData[routeVal];
 
-    // ২. স্পেস বা স্মল/ক্যাপিটাল লেটারের অমিল থাকলেও খুঁজে বের করবে
+    
     const cleanRoute = String(routeVal).trim().toLowerCase();
     for (let key in routesData) {
         if (String(key).trim().toLowerCase() === cleanRoute) {
@@ -1185,7 +1185,7 @@ function onSRRouteSelect() {
         bazarsList.forEach((bazar, index) => {
             const bName = typeof bazar === 'string' ? bazar : (bazar ? (bazar.name || bazar.bazarName || '') : '');
             if (bName && bName.trim() !== '') {
-                // ইন্ডেক্স এবং নাম দুটোই ডাটা অ্যাট্রিবিউটে রাখা হচ্ছে সেফটির জন্য
+                
                 optionsHtml += `<option value="${index}" data-name="${bName.trim()}">${bName.trim()}</option>`;
             }
         });
