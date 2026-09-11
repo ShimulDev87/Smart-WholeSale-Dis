@@ -587,22 +587,7 @@ function loadDistricts() {
     if (div && divisionsData[div]) divisionsData[div].forEach(d => distSelect.innerHTML += `<option value="${d}">${d}</option>`);
 }
 
-function addRoute() {
-    const routeInput = document.getElementById('newRouteInput');
-    const routeName = routeInput ? routeInput.value.trim() : '';
-    if (!routeName) return alert("রুটের নাম লিখুন!");
 
-    if (!routesData[routeName]) {
-        routesData[routeName] = { bazars: [], shops: {} };
-        alert(`'${routeName}' সফলভাবে যুক্ত হয়েছে!`);
-        if (routeInput) routeInput.value = '';
-        saveDataToLocalStorage();
-        updateRouteDropdowns();
-        updateSrSetupRouteDropdown();
-    } else {
-        alert("এই রুটটি আগেই তৈরি করা আছে!");
-    }
-}
 
 function updateRouteDropdowns() {
     const setupSelect = document.getElementById('setupRouteSelect');
@@ -709,12 +694,7 @@ function renderShopTableRows() {
     }
 }
 
-function saveBazarAndShops() {
-    if (!currentRoute) return alert("দয়া করে রুট নির্বাচন করুন!");
-    saveCurrentShopInputs();
-    saveDataToLocalStorage();
-    alert(`'${currentRoute}' রুটের সকল বাজার ও দোকান সফলভাবে সেভ করা হয়েছে!`);
-}
+
 
 // ==========================================
 // 9. MANAGER SR SETUP & SYSTEM INTEGRATION (বাগ ফিক্সড)
@@ -1016,38 +996,6 @@ async function handleSRLogin(event) {
     }
 }
 
-// রুট, বাজার ও দোকানের ডাটা ফায়ারবেজ থেকে সিঙ্ক এবং UI আপডেট করার ফাংশন
-function syncMasterDataFromCloud() {
-    if (typeof db === 'undefined' || !db) return;
-
-    // ১. রুট সিঙ্ক
-    db.ref('routes').on('value', (snap) => {
-        if (snap.exists()) {
-            const routesData = snap.val();
-            localStorage.setItem('routes', JSON.stringify(routesData));
-            if (typeof state !== 'undefined') state.routes = routesData;
-            if (typeof renderRouteDropdowns === 'function') renderRouteDropdowns();
-        }
-    });
-
-    // ২. বাজার সিঙ্ক
-    db.ref('bazars').on('value', (snap) => {
-        if (snap.exists()) {
-            const bazarsData = snap.val();
-            localStorage.setItem('bazars', JSON.stringify(bazarsData));
-            if (typeof state !== 'undefined') state.bazars = bazarsData;
-        }
-    });
-
-    // ৩. দোকান সিঙ্ক
-    db.ref('shops').on('value', (snap) => {
-        if (snap.exists()) {
-            const shopsData = snap.val();
-            localStorage.setItem('shops', JSON.stringify(shopsData));
-            if (typeof state !== 'undefined') state.shops = shopsData;
-        }
-    });
-}
 
 // অ্যাপ লোড হওয়ার সময় কল হবে
 document.addEventListener('DOMContentLoaded', () => {
@@ -1580,21 +1528,27 @@ function submitOrder() {
     const bazarIndex = document.getElementById('srBazarSelect').value;
 
     let bazarName = '';
-    if (routesData && routesData[route] && routesData[route].bazars) bazarName = routesData[route].bazars[bazarIndex] || '';
+    if (routesData && routesData[route] && routesData[route].bazars) {
+        bazarName = routesData[route].bazars[bazarIndex] || '';
+    }
 
     const now = new Date();
     const orderTime = now.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
     
+    // ডিভাইস নিরপেক্ষ ISO তারিখ (YYYY-MM-DD)
     const dateInputValue = document.getElementById('orderDateInput')?.value;
-    let targetDate = new Date();
-    
+    let yyyy, mm, dd;
     if (dateInputValue) {
-        const [yyyy, mm, dd] = dateInputValue.split('-');
-        targetDate = new Date(yyyy, parseInt(mm) - 1, dd);
+        [yyyy, mm, dd] = dateInputValue.split('-');
+    } else {
+        yyyy = now.getFullYear();
+        mm = String(now.getMonth() + 1).padStart(2, '0');
+        dd = String(now.getDate()).padStart(2, '0');
     }
-
-    const orderDate = targetDate.toLocaleDateString('bn-BD');
-    const dayName = targetDate.toLocaleDateString('bn-BD', { weekday: 'long' });
+    
+    const isoDate = `${yyyy}-${mm}-${dd}`;
+    const displayDate = `${dd}/${mm}/${yyyy}`;
+    const dayName = now.toLocaleDateString('bn-BD', { weekday: 'long' });
 
     const totalAmount = cart.reduce((sum, item) => sum + (item.price * (item.qty || 1)), 0);
 
@@ -1609,7 +1563,8 @@ function submitOrder() {
         totalAmount: totalAmount,
         total: totalAmount,
         time: orderTime,
-        date: orderDate,
+        date: displayDate,
+        isoDate: isoDate,
         dayName: dayName,
         timestamp: now.getTime()
     };
@@ -1617,10 +1572,8 @@ function submitOrder() {
     if (!Array.isArray(state.orders)) state.orders = [];
     state.orders.push(newOrder);
 
-    // ১. লোকাল স্টোরেজ সেভ
+    // লোকাল ও ফায়ারবেজ সেভ
     saveDataToLocalStorage();
-
-    // ২. ফায়ারবেজ ক্লাউড ডাটাবেজে সেভ (অন্যান্য ডিভাইসে পাঠানোর জন্য)
     saveOrderToCloud(newOrder);
 
     generateDailySummary();
@@ -1742,21 +1695,18 @@ function generateDailySummary() {
         }
         summaryTable.innerHTML = '';
 
-        const todayRaw = new Date().toLocaleDateString('bn-BD');
-        if (document.getElementById('summaryDate')) document.getElementById('summaryDate').innerText = `তারিখ: ${todayRaw}`;
+        const now = new Date();
+        const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const todayDisplay = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
 
-        // নিখুঁত তারিখ ম্যাচিং (বাংলা সংখ্যাকে ইংরেজিতে এনে জিরো কাটবে)
-        const normalizeDate = (str) => {
-            if (!str) return '';
-            let enStr = convertBnToEnNum(str); 
-            return enStr.replace(/^0+|(?<=\/)0+/g, '').trim(); 
-        };
-
-        const todayNormalized = normalizeDate(todayRaw);
+        if (document.getElementById('summaryDate')) {
+            document.getElementById('summaryDate').innerText = `তারিখ: ${todayDisplay}`;
+        }
 
         const todaysOrders = state.orders.filter(order => {
-            if (!order || !order.date) return false;
-            return normalizeDate(order.date) === todayNormalized;
+            if (!order) return false;
+            if (order.isoDate) return order.isoDate === todayIso;
+            return true;
         });
 
         let totalOrders = todaysOrders.length, grandTotalAmount = 0, totalItemsCount = 0;
@@ -1872,11 +1822,12 @@ function syncOrdersFromCloud() {
                 state.orders = orderList;
                 localStorage.setItem('orders', JSON.stringify(orderList));
 
-                // ম্যানেজার প্যানেলের মেমো ও সামারি অটো আপডেট
                 if (typeof generateDailySummary === 'function') generateDailySummary();
                 if (typeof renderMemoList === 'function') renderMemoList();
             }
         }
+    }, (error) => {
+        console.error("❌ Order Sync Error:", error);
     });
 }
 
