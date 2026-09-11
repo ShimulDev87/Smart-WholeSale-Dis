@@ -272,6 +272,32 @@ function handleManagerLogin(e) {
     }
 }
 
+// 🆕 ফায়ারবেজে কোম্পানির নাম সেভ করার জন্য গ্লোবাল ফাংশন
+function saveCompanyNameGlobally(newName) {
+    if (!newName) return;
+
+    // ১. লোকাল স্টেট ও স্টোরেজ আপডেট
+    state.companyName = newName;
+    localStorage.setItem('companyName', newName);
+    syncCompanyNameToUI(newName);
+
+    // ২. ফায়ারবেজে ডাটা পাঠানো (database বা db উভয়ই চেক করবে)
+    const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
+
+    if (firebaseDb) {
+        firebaseDb.ref('companyInfo').update({
+            companyName: newName,
+            updatedAt: new Date().toISOString()
+        }).then(() => {
+            console.log("✅ ফায়ারবেজে সফলভাবে সেভ হয়েছে:", newName);
+        }).catch(err => {
+            console.error("❌ ফায়ারবেজে সেভ হতে সমস্যা:", err);
+        });
+    } else {
+        console.error("⚠️ ফায়ারবেজ ডাটাবেজ অবজেক্ট পাওয়া যায়নি!");
+    }
+}
+
 function logoutManager() {
     if (confirm('আপনি কি ম্যানেজার প্যানেল থেকে লগআউট করতে চান?')) {
         sessionStorage.removeItem('isManagerLoggedIn');
@@ -299,21 +325,22 @@ function applyOwnerConfig(owner) {
     syncCompanyNameToUI(owner.companyName);
     localStorage.setItem('selectedCategories', JSON.stringify(owner.categories || []));
     syncCategoriesGlobally(owner.categories || []);
-    saveDataToLocalStorage();
+    if (typeof saveDataToLocalStorage === 'function') saveDataToLocalStorage();
 
-    // 🆕 ফায়ারবেজ ক্লাউডে কোম্পানির তথ্য সেভ করা
-    if (typeof database !== 'undefined') {
-        database.ref('companyInfo').set({
+    // 🚀 ফায়ারবেজ ক্লাউডে নাম ও ক্যাটাগরি সেভ করা
+    const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
+    if (firebaseDb) {
+        firebaseDb.ref('companyInfo').set({
             companyName: owner.companyName,
-            ownerName: owner.ownerName || '',
-            phone: owner.phone || '',
             categories: owner.categories || [],
             updatedAt: new Date().toISOString()
         }).then(() => {
-            console.log("✅ কোম্পানির তথ্য ফায়ারবেজে আপলোড হয়েছে!");
+            console.log("✅ ফায়ারবেজে কোম্পানির নাম ও ক্যাটাগরি সেভ হয়েছে!");
         }).catch(err => {
-            console.error("❌ কোম্পানির তথ্য ফায়ারবেজে পাঠাতে সমস্যা:", err);
+            console.error("❌ ফায়ারবেজ সেভ এরর:", err);
         });
+    } else {
+        console.warn("⚠️ Firebase Database অবজেক্ট পাওয়া যায়নি!");
     }
 }
 
