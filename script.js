@@ -347,7 +347,7 @@ function applyOwnerConfig(owner) {
 }
 
 
-// 🌐 ফায়ারবেজে ডাটা না থাকলে অটো-আপলোড এবং অন্য ডিভাইসে রিয়েলটাইম সিঙ্ক করার ফাংশন
+// 🌐 ফায়ারবেজ থেকে কোম্পানির তথ্য সিঙ্ক ও সেশন সিকিউরিটি ফাংশন
 function syncCompanyInfoFromCloud() {
     const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
     if (!firebaseDb) return;
@@ -355,28 +355,31 @@ function syncCompanyInfoFromCloud() {
     firebaseDb.ref('companyInfo').on('value', (snapshot) => {
         const data = snapshot.val();
         
+        // 🛡️ সেশন চেক: ম্যানেজার বা এসআর লগইন অবস্থায় আছে কিনা
+        const isManagerLoggedIn = sessionStorage.getItem('isManagerLoggedIn') === 'true';
+        const activeSR = localStorage.getItem('activeSR');
+        
         if (data && data.companyName) {
-            // ১. ফায়ারবেজে ডাটা থাকলে তা UI এবং LocalStorage-এ বসাবে
-            state.companyName = data.companyName;
-            localStorage.setItem('companyName', data.companyName);
-            syncCompanyNameToUI(data.companyName);
+            // ১. কেবল ব্যবহারকারী লগইন করা থাকলেই UI ও LocalStorage আপডেট হবে
+            if (isManagerLoggedIn || activeSR) {
+                state.companyName = data.companyName;
+                localStorage.setItem('companyName', data.companyName);
+                syncCompanyNameToUI(data.companyName);
 
-            if (data.categories) {
-                localStorage.setItem('selectedCategories', JSON.stringify(data.categories));
-                if (typeof syncCategoriesGlobally === 'function') {
-                    syncCategoriesGlobally(data.categories);
+                if (data.categories && Array.isArray(data.categories)) {
+                    localStorage.setItem('selectedCategories', JSON.stringify(data.categories));
+                    if (typeof syncCategoriesGlobally === 'function') {
+                        syncCategoriesGlobally(data.categories);
+                    }
                 }
             }
         } else {
-            // 🚀 ২. ফায়ারবেজে companyInfo না থাকলে এটি অটোমেটিক ফায়ারবেজে আপলোড করে নোড তৈরি করবে!
+            // 🚀 ২. ফায়ারবেজে ডাটা না থাকলে কেবল ম্যানেজার লগইন থাকা পিসি থেকেই ডাটা আপলোড হবে
             const owner = typeof getOwnerProfile === 'function' ? getOwnerProfile() : null;
-            const currentName = (owner && owner.companyName) || localStorage.getItem('companyName') || state.companyName;
-            const currentCats = owner ? (owner.categories || []) : JSON.parse(localStorage.getItem('selectedCategories') || '[]');
-
-            if (currentName && currentName !== 'Smart Wholesale') {
+            if (isManagerLoggedIn && owner && owner.companyName) {
                 firebaseDb.ref('companyInfo').set({
-                    companyName: currentName,
-                    categories: currentCats,
+                    companyName: owner.companyName,
+                    categories: owner.categories || [],
                     updatedAt: new Date().toISOString()
                 }).then(() => {
                     console.log("✅ ফায়ারবেজে সফলভাবে companyInfo নোড তৈরি হয়েছে!");
@@ -976,29 +979,29 @@ function switchToSRView() {
 // ==========================================
 // স্মার্ট এসআর লগইন (সব ডিভাইস ও ফায়ারবেজ সামঞ্জস্যপূর্ণ)
 // ==========================================
+// 🚀 SR লগইন এবং অটো-কোম্পানি ও লোকেশন সেটআপ ফাংশন
 async function handleSRLogin(event) {
-    if (event) event.preventDefault(); // পেইজ রিলোড হওয়া আটকানো
+    if (event) event.preventDefault();
 
     const inputElem = document.getElementById('loginSrId');
     let userSrId = inputElem ? inputElem.value.trim() : '';
-
     if (!userSrId) return alert("দয়া করে এসআর আইডি লিখুন!");
 
-    // ১. আইডি ফরম্যাট ঠিক করা (যেমন: 6811 লিখলে অটো SR-6811 বানিয়ে নেওয়া)
     userSrId = userSrId.toUpperCase();
     if (!userSrId.startsWith('SR-') && !isNaN(userSrId)) {
         userSrId = 'SR-' + userSrId;
     }
 
-    let foundSR = null;
     const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
+    let foundSR = null;
+    let companyInfo = null;
 
-    // ২. ফায়ারবেজ থেকে সরাসরি আইডি খোঁজা
+    // ১. ফায়ারবেজ থেকে SR এবং কোম্পানির তথ্য একসাথে খোঁজা
     if (firebaseDb) {
         try {
-            const snapshot = await firebaseDb.ref('srs/' + userSrId).once('value');
-            if (snapshot.exists()) {
-                foundSR = snapshot.val();
+            const srSnap = await firebaseDb.ref('srs/' + userSrId).once('value');
+            if (srSnap.exists()) {
+                foundSR = srSnap.val();
             } else {
                 const allSrsSnap = await firebaseDb.ref('srs').once('value');
                 if (allSrsSnap.exists()) {
@@ -1009,88 +1012,34 @@ async function handleSRLogin(event) {
                     });
                 }
             }
+
+            // কোম্পানির নাম ও ক্যাটাগরি ফেচ করা
+            const compSnap = await firebaseDb.ref('companyInfo').once('value');
+            if (compSnap.exists()) {
+                companyInfo = compSnap.val();
+            }
         } catch (err) {
             console.error("Firebase Search Error:", err);
         }
     }
 
-    // ৩. ফায়ারবেজে না পেলে লোকাল ডাটাবেজে খোঁজা (Fallback)
+    // লোকাল ব্যাকআপ
     if (!foundSR) {
         const localSrs = JSON.parse(localStorage.getItem('app_sr_accounts') || '[]')
             .concat(JSON.parse(localStorage.getItem('srAccounts') || '[]'));
-
         foundSR = localSrs.find(sr => {
             const sId = (sr.id || sr.srId || '').toUpperCase();
             return sId === userSrId || sId === userSrId.replace('SR-', '');
         });
     }
 
-    // ৪. ফলাফল যাচাই ও অটো-ড্রপডাউন অপশন তৈরি
+    // ২. লগইন সফল হলে কোম্পানির ডাটা ও SR প্রোফাইল বাইন্ড করা
     if (foundSR) {
-        // 🆕 ফায়ারবেজ থেকে কোম্পানির নাম সরাসরি নিয়ে আসা ও UI-তে দেখানো
-        if (firebaseDb) {
-            try {
-                const companySnap = await firebaseDb.ref('companyInfo').once('value');
-                if (companySnap.exists() && companySnap.val().companyName) {
-                    const cName = companySnap.val().companyName;
-                    state.companyName = cName;
-                    localStorage.setItem('companyName', cName);
-                    if (typeof syncCompanyNameToUI === 'function') {
-                        syncCompanyNameToUI(cName);
-                    }
-                }
-            } catch (cErr) {
-                console.error("Company Name Load Error:", cErr);
-            }
-        }
+        applySRSession(foundSR, companyInfo);
 
-        alert(`✅ স্বাগতম, ${foundSR.name || 'এসআর'}!\nলগইন সফল হয়েছে।`);
+        alert(`✅ স্বাগতম, ${foundSR.name || 'এসআর'}!\nআপনার কোম্পানির প্যানেলে লগইন সফল হয়েছে।`);
 
-        // একটিভ SR সেভ করা
-        localStorage.setItem('activeSR', JSON.stringify(foundSR));
-
-        // নাম বসানো
-        const srNameInput = document.getElementById('srNameInput');
-        if (srNameInput) srNameInput.value = foundSR.name || '';
-
-        const assignedRoute = foundSR.route || foundSR.assignedRoute;
-        const assignedBazar = foundSR.bazar || foundSR.assignedBazar;
-
-        // ১. রুট সিলেক্ট করা (ড্রপডাউনে না থাকলে অটো তৈরি করবে)
-        const routeSelect = document.getElementById('srRouteSelect');
-        if (routeSelect && assignedRoute) {
-            let hasOption = Array.from(routeSelect.options).some(opt => opt.value === assignedRoute);
-            if (!hasOption) {
-                const newOpt = document.createElement('option');
-                newOpt.value = assignedRoute;
-                newOpt.textContent = assignedRoute;
-                routeSelect.appendChild(newOpt);
-            }
-            routeSelect.value = assignedRoute;
-
-            // রুট সিলেক্টের ইভেন্ট ট্রিগার
-            if (typeof onSRRouteSelect === 'function') {
-                onSRRouteSelect();
-            }
-        }
-
-        // ২. বাজার সিলেক্ট করা (রুট সিলেক্টের রিসেট প্রসেস শেষ হতে ১৫০ms সময় দেওয়া)
-        setTimeout(() => {
-            const bazarSelect = document.getElementById('srBazarSelect');
-            if (bazarSelect && assignedBazar) {
-                let hasOption = Array.from(bazarSelect.options).some(opt => opt.value === assignedBazar);
-                if (!hasOption) {
-                    const newOpt = document.createElement('option');
-                    newOpt.value = assignedBazar;
-                    newOpt.textContent = assignedBazar;
-                    bazarSelect.appendChild(newOpt);
-                }
-                bazarSelect.value = assignedBazar;
-                if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
-            }
-        }, 150);
-
-        // মডাল বন্ধ করা
+        // মডাল হাইড করা
         const modalElem = document.getElementById('srAuthModal');
         if (modalElem) {
             if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
@@ -1102,10 +1051,75 @@ async function handleSRLogin(event) {
         }
 
         if (typeof switchToSRView === 'function') switchToSRView();
-
     } else {
         alert(`❌ ভুল এসআর আইডি: "${userSrId}"\nকোনো ডাটা পাওয়া যায়নি।`);
     }
+}
+
+// 🎯 SR-এর সেশন, বিভাগ, জেলা, রুট ও ক্যাটাগরি অটো সেটিং করার হেলপার ফাংশন
+function applySRSession(srData, companyData) {
+    // ১. লগইন স্টেট ও একটিভ SR সেভ
+    localStorage.setItem('activeSR', JSON.stringify(srData));
+    sessionStorage.setItem('isSRLoggedIn', 'true');
+
+    // ২. ফায়ারবেজ থেকে আসা কোম্পানির নাম ও ক্যাটাগরি সেট
+    if (companyData) {
+        if (companyData.companyName) {
+            state.companyName = companyData.companyName;
+            localStorage.setItem('companyName', companyData.companyName);
+            syncCompanyNameToUI(companyData.companyName);
+        }
+        if (companyData.categories && Array.isArray(companyData.categories)) {
+            localStorage.setItem('selectedCategories', JSON.stringify(companyData.categories));
+            if (typeof syncCategoriesGlobally === 'function') {
+                syncCategoriesGlobally(companyData.categories);
+            }
+        }
+    }
+
+    // ৩. এসআর নাম অটো বসানো
+    const srNameInput = document.getElementById('srNameInput');
+    if (srNameInput) srNameInput.value = srData.name || '';
+
+    // ৪. বিভাগ ও জেলা সিলেক্ট করা (যদি ডাটা থাকে)
+    if (srData.division && document.getElementById('srDivisionSelect')) {
+        document.getElementById('srDivisionSelect').value = srData.division;
+    }
+    if (srData.district && document.getElementById('srDistrictSelect')) {
+        document.getElementById('srDistrictSelect').value = srData.district;
+    }
+
+    // ৫. রুট সিলেক্ট করা
+    const assignedRoute = srData.route || srData.assignedRoute;
+    const routeSelect = document.getElementById('srRouteSelect');
+    if (routeSelect && assignedRoute) {
+        let hasOption = Array.from(routeSelect.options).some(opt => opt.value === assignedRoute);
+        if (!hasOption) {
+            const newOpt = document.createElement('option');
+            newOpt.value = assignedRoute;
+            newOpt.textContent = assignedRoute;
+            routeSelect.appendChild(newOpt);
+        }
+        routeSelect.value = assignedRoute;
+        if (typeof onSRRouteSelect === 'function') onSRRouteSelect();
+    }
+
+    // ৬. বাজার সিলেক্ট করা
+    const assignedBazar = srData.bazar || srData.assignedBazar;
+    setTimeout(() => {
+        const bazarSelect = document.getElementById('srBazarSelect');
+        if (bazarSelect && assignedBazar) {
+            let hasOption = Array.from(bazarSelect.options).some(opt => opt.value === assignedBazar);
+            if (!hasOption) {
+                const newOpt = document.createElement('option');
+                newOpt.value = assignedBazar;
+                newOpt.textContent = assignedBazar;
+                bazarSelect.appendChild(newOpt);
+            }
+            bazarSelect.value = assignedBazar;
+            if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
+        }
+    }, 150);
 }
 
 // অ্যাপ লোড হওয়ার সময় কল হবে
