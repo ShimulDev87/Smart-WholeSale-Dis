@@ -179,6 +179,30 @@ function showSection(sectionId) {
     if (target) target.classList.remove('d-none');
 }
 
+function updateRoleBasedUI() {
+    const isManagerLoggedIn = sessionStorage.getItem('isManagerLoggedIn') === 'true';
+    const activeSR = localStorage.getItem('activeSR');
+
+    // ১. ওনার/ম্যানেজার কার্ড (HTML Structure অনুযায়ী ID বা Selector)
+    const managerCard = document.getElementById('managerPanelCard') 
+                     || document.querySelector('#home-view .row > div:first-child');
+
+    // ২. হেডারের পেনসিল (Edit) বাটন
+    const editCompanyBtn = document.querySelector('.header-company-edit-btn') 
+                        || document.querySelector('header .fa-edit')?.parentElement 
+                        || document.querySelector('header button[onclick*="Modal"]');
+
+    if (activeSR && !isManagerLoggedIn) {
+        // 🔒 SR লগইন থাকলে ম্যানেজার কার্ড ও পেনসিল এডিট বাটন হাইড হবে
+        if (managerCard) managerCard.style.display = 'none';
+        if (editCompanyBtn) editCompanyBtn.style.display = 'none';
+    } else {
+        // 🔓 স্বাভাবিক অবস্থায় দুটি প্যানেলই শো করবে
+        if (managerCard) managerCard.style.display = 'block';
+        if (editCompanyBtn) editCompanyBtn.style.display = 'inline-block';
+    }
+}
+
 function showHomeView() {
     showSection('home-view');
     const memoPane = document.getElementById('memo-pane');
@@ -186,6 +210,11 @@ function showHomeView() {
     const inventoryTabBtn = document.getElementById('inventory-tab');
     if (inventoryTabBtn && typeof bootstrap !== 'undefined') {
         new bootstrap.Tab(inventoryTabBtn).show();
+    }
+
+    // 🚀 এসআর বা ম্যানেজার সেশন অনুযায়ী হোম ভিউ ফিল্টার
+    if (typeof updateRoleBasedUI === 'function') {
+        updateRoleBasedUI();
     }
 }
 
@@ -197,35 +226,51 @@ function getOwnerProfile() {
     return raw ? JSON.parse(raw) : null;
 }
 
-function openManagerPanel() {
-    const owner = getOwnerProfile();
-    const isLoggedIn = sessionStorage.getItem('isManagerLoggedIn') === 'true';
 
-    if (!owner) {
-        showManagerAuthModal('register');
-    } else if (!isLoggedIn) {
-        showManagerAuthModal('login');
+// 🔒 ম্যানেজার প্যানেলে প্রবেশের সিকিউরিটি চেক
+function openManagerPanel() {
+    const isManagerLoggedIn = sessionStorage.getItem('isManagerLoggedIn') === 'true';
+    
+    if (isManagerLoggedIn) {
+        // ১. ম্যানেজার লগইন থাকলে সরাসরি প্যানেলে ঢুকবে
+        showSection('manager-view');
+        if (typeof renderMgrProducts === 'function') renderMgrProducts();
     } else {
-        loadManagerPanelData();
+        // ২. ম্যানেজার লগইন না থাকলে রেজিস্টার/লগইন মোডাল ওপেন হবে
+        showManagerAuthModal('login');
     }
 }
+
+
 function openManagerAuthModal() { openManagerPanel(); }
 
-function showManagerAuthModal(mode) {
-    const regForm = document.getElementById('managerRegisterForm');
+// 🪟 মোডাল হ্যান্ডলার (Login/Register সুইচ)
+function showManagerAuthModal(type = 'login') {
+    const owner = typeof getOwnerProfile === 'function' ? getOwnerProfile() : null;
+    const registerForm = document.getElementById('managerRegisterForm');
     const loginForm = document.getElementById('managerLoginForm');
-    const title = document.getElementById('managerModalTitle');
+    const modalTitle = document.getElementById('managerModalTitle');
 
-    if (mode === 'login') {
-        if (regForm) regForm.classList.add('d-none');
-        if (loginForm) loginForm.classList.remove('d-none');
-        if (title) title.innerHTML = '<i class="fa-solid fa-right-to-bracket me-2"></i>ম্যানেজার প্যানেল লগইন';
+    if (!owner) {
+        // ওনার অ্যাকাউন্ট না থাকলে রেজিস্টার ফর্ম দেখাবে
+        registerForm.classList.remove('d-none');
+        loginForm.classList.add('d-none');
+        if (modalTitle) modalTitle.innerHTML = `<i class="fa-solid fa-user-shield me-2"></i>নতুন স্টোর সেটআপ করুন`;
+    } else if (type === 'login') {
+        registerForm.classList.add('d-none');
+        loginForm.classList.remove('d-none');
+        if (modalTitle) modalTitle.innerHTML = `<i class="fa-solid fa-lock me-2"></i>ম্যানেজার প্যানেল লগইন`;
     } else {
-        if (loginForm) loginForm.classList.add('d-none');
-        if (regForm) regForm.classList.remove('d-none');
-        if (title) title.innerHTML = '<i class="fa-solid fa-user-shield me-2"></i>স্টোর ও ম্যানেজার অ্যাকাউন্ট সেটআপ';
+        registerForm.classList.remove('d-none');
+        loginForm.classList.add('d-none');
+        if (modalTitle) modalTitle.innerHTML = `<i class="fa-solid fa-user-plus me-2"></i>নতুন স্টোর রেজিস্টার`;
     }
-    showModal('managerAuthModal');
+
+    const modalElement = document.getElementById('managerAuthModal');
+    if (modalElement && typeof bootstrap !== 'undefined') {
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
+        modalInstance.show();
+    }
 }
 
 function handleManagerRegister(e) {
@@ -255,7 +300,6 @@ function handleManagerRegister(e) {
     applyOwnerConfig(ownerProfile);
     loadManagerPanelData();
 }
-
 function handleManagerLogin(e) {
     e.preventDefault();
     const phone = document.getElementById('loginManagerPhone').value.trim();
@@ -264,6 +308,11 @@ function handleManagerLogin(e) {
 
     if (owner && owner.phone === phone && owner.password === pass) {
         sessionStorage.setItem('isManagerLoggedIn', 'true');
+        
+        // ১. ইনপুট ফিল্ড ক্লিয়ার করা
+        document.getElementById('managerLoginForm').reset();
+
+        // ২. মোডাল বন্ধ ও ডাটা লোড
         hideModal('managerAuthModal');
         applyOwnerConfig(owner);
         loadManagerPanelData();
@@ -271,6 +320,28 @@ function handleManagerLogin(e) {
         alert('ফোন নম্বর বা পাসওয়ার্ড ভুল হয়েছে!');
     }
 }
+
+function loadManagerPanelData() {
+    // প্যানেল সেকশন প্রদর্শন করা (যদি showSection ব্যবহৃত হয়)
+    if (typeof showSection === 'function') {
+        showSection('manager-view');
+    }
+    
+    // ডাটা রেন্ডার ফাংশনগুলো কল করা
+    if (typeof renderMgrProducts === 'function') renderMgrProducts();
+    if (typeof renderOrdersList === 'function') renderOrdersList();
+}
+
+function handleManagerLogout() {
+    sessionStorage.removeItem('isManagerLoggedIn');
+    alert('ম্যানেজার প্যানেল থেকে লগআউট করা হয়েছে।');
+    
+    // হোম পেজ বা কাস্টমার ভিউতে ফেরত পাঠানো
+    if (typeof showSection === 'function') {
+        showSection('home-view');
+    }
+}
+
 
 // 🆕 ফায়ারবেজে কোম্পানির নাম সেভ করার জন্য গ্লোবাল ফাংশন
 function saveCompanyNameGlobally(newName) {
@@ -1995,7 +2066,7 @@ document.addEventListener('DOMContentLoaded', () => {
             syncCategoriesGlobally(owner.categories || []);
         }
     } else if (activeSR) {
-        // এসআর লগইন অবস্থায় থাকলে তবেই ডাটা দেখাবে
+        // এসআর লগইন অবস্থায় থাকলে তবেই ডাটা দেখাবে
         const savedCompanyName = localStorage.getItem('companyName');
         if (savedCompanyName) {
             state.companyName = savedCompanyName;
@@ -2008,6 +2079,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof ALL_BUSINESS_CATEGORIES !== 'undefined') {
             syncCategoriesGlobally(ALL_BUSINESS_CATEGORIES);
         }
+    }
+
+    // 🚀 পেজ লোড বা রিফ্রেশ হলে SR বনাম Manager এর UI ফিল্টার কল করা
+    if (typeof updateRoleBasedUI === 'function') {
+        updateRoleBasedUI();
     }
 
     // ==========================================
