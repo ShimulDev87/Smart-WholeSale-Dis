@@ -327,7 +327,7 @@ function applyOwnerConfig(owner) {
     syncCategoriesGlobally(owner.categories || []);
     if (typeof saveDataToLocalStorage === 'function') saveDataToLocalStorage();
 
-    // 🚀 ফায়ারবেজে ডাটা পাঠানো (database অথবা db অটো সিলেক্ট করবে)
+    // 🚀 ফায়ারবেজ ক্লাউডে কোম্পানির তথ্য অটো-সেভ
     const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
     if (firebaseDb) {
         firebaseDb.ref('companyInfo').set({
@@ -335,12 +335,10 @@ function applyOwnerConfig(owner) {
             categories: owner.categories || [],
             updatedAt: new Date().toISOString()
         }).then(() => {
-            console.log("✅ ফায়ারবেজে কোম্পানির নাম আপলোড হয়েছে!");
+            console.log("✅ ফায়ারবেজে কোম্পানির তথ্য সফলভাবে আপডেট হয়েছে!");
         }).catch(err => {
-            console.error("❌ ফায়ারবেজে সেভ হতে ব্যর্থ:", err);
+            console.error("❌ ফায়ারবেজে আপলোড এরর:", err);
         });
-    } else {
-        console.error("❌ ফায়ারবেজ ডাটাবেজ অবজেক্ট পাওয়া যায়নি!");
     }
 }
 
@@ -461,6 +459,7 @@ function openEditCompanyModal() {
     showModal('editCompanyModal');
 }
 
+
 function updateCompanyNameFromModal() {
     const newName = document.getElementById('modalCompanyNameInput')?.value.trim();
     const enteredPin = document.getElementById('modalOwnerPinInput')?.value.trim();
@@ -474,6 +473,8 @@ function updateCompanyNameFromModal() {
 
     owner.companyName = newName;
     localStorage.setItem('activeOwnerProfile', JSON.stringify(owner));
+    
+    // 🚀 এটি কল হওয়া মাত্রই ধাপ-১ এর ফায়ারবেজ সেভ চালু হয়ে যাবে
     applyOwnerConfig(owner);
 
     hideModal('editCompanyModal');
