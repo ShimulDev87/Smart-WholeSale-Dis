@@ -342,27 +342,42 @@ function applyOwnerConfig(owner) {
     }
 }
 
-// 🆕 ফায়ারবেজ থেকে রিয়েলটাইমে কোম্পানির নাম ও ক্যাটাগরি পড়ার ফাংশন
-function syncCompanyInfoFromCloud() {
-    if (typeof database === 'undefined') return;
 
-    database.ref('companyInfo').on('value', (snapshot) => {
+// 🌐 ফায়ারবেজে ডাটা না থাকলে অটো-আপলোড এবং অন্য ডিভাইসে রিয়েলটাইম সিঙ্ক করার ফাংশন
+function syncCompanyInfoFromCloud() {
+    const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
+    if (!firebaseDb) return;
+
+    firebaseDb.ref('companyInfo').on('value', (snapshot) => {
         const data = snapshot.val();
+        
         if (data && data.companyName) {
-            // Local State এবং Storage আপডেট
+            // ১. ফায়ারবেজে ডাটা থাকলে তা UI এবং LocalStorage-এ বসাবে
             state.companyName = data.companyName;
             localStorage.setItem('companyName', data.companyName);
+            syncCompanyNameToUI(data.companyName);
 
-            // ক্যাটাগরি আপডেট
             if (data.categories) {
                 localStorage.setItem('selectedCategories', JSON.stringify(data.categories));
                 if (typeof syncCategoriesGlobally === 'function') {
                     syncCategoriesGlobally(data.categories);
                 }
             }
+        } else {
+            // 🚀 ২. ফায়ারবেজে companyInfo না থাকলে এটি অটোমেটিক ফায়ারবেজে আপলোড করে নোড তৈরি করবে!
+            const owner = typeof getOwnerProfile === 'function' ? getOwnerProfile() : null;
+            const currentName = (owner && owner.companyName) || localStorage.getItem('companyName') || state.companyName;
+            const currentCats = owner ? (owner.categories || []) : JSON.parse(localStorage.getItem('selectedCategories') || '[]');
 
-            // UI-তে কোম্পানির নাম দেখানো
-            syncCompanyNameToUI(data.companyName);
+            if (currentName && currentName !== 'Smart Wholesale') {
+                firebaseDb.ref('companyInfo').set({
+                    companyName: currentName,
+                    categories: currentCats,
+                    updatedAt: new Date().toISOString()
+                }).then(() => {
+                    console.log("✅ ফায়ারবেজে সফলভাবে companyInfo নোড তৈরি হয়েছে!");
+                });
+            }
         }
     });
 }
@@ -965,15 +980,16 @@ async function handleSRLogin(event) {
     }
 
     let foundSR = null;
+    const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
 
     // ২. ফায়ারবেজ থেকে সরাসরি আইডি খোঁজা
-    if (typeof db !== 'undefined' && db) {
+    if (firebaseDb) {
         try {
-            const snapshot = await db.ref('srs/' + userSrId).once('value');
+            const snapshot = await firebaseDb.ref('srs/' + userSrId).once('value');
             if (snapshot.exists()) {
                 foundSR = snapshot.val();
             } else {
-                const allSrsSnap = await db.ref('srs').once('value');
+                const allSrsSnap = await firebaseDb.ref('srs').once('value');
                 if (allSrsSnap.exists()) {
                     const allData = allSrsSnap.val();
                     foundSR = Object.values(allData).find(sr => {
@@ -1000,6 +1016,23 @@ async function handleSRLogin(event) {
 
     // ৪. ফলাফল যাচাই ও অটো-ড্রপডাউন অপশন তৈরি
     if (foundSR) {
+        // 🆕 ফায়ারবেজ থেকে কোম্পানির নাম সরাসরি নিয়ে আসা ও UI-তে দেখানো
+        if (firebaseDb) {
+            try {
+                const companySnap = await firebaseDb.ref('companyInfo').once('value');
+                if (companySnap.exists() && companySnap.val().companyName) {
+                    const cName = companySnap.val().companyName;
+                    state.companyName = cName;
+                    localStorage.setItem('companyName', cName);
+                    if (typeof syncCompanyNameToUI === 'function') {
+                        syncCompanyNameToUI(cName);
+                    }
+                }
+            } catch (cErr) {
+                console.error("Company Name Load Error:", cErr);
+            }
+        }
+
         alert(`✅ স্বাগতম, ${foundSR.name || 'এসআর'}!\nলগইন সফল হয়েছে।`);
 
         // একটিভ SR সেভ করা
@@ -1030,7 +1063,7 @@ async function handleSRLogin(event) {
             }
         }
 
-        // ২. বাজার সিলেক্ট করা (রুট সিলেক্টের রিসেট প্রসেস শেষ হতে ১৫০ms সময় দেওয়া)
+        // ২. বাজার সিলেক্ট করা (রুট সিলেক্টের রিসেট প্রসেস শেষ হতে ১৫০ms সময় দেওয়া)
         setTimeout(() => {
             const bazarSelect = document.getElementById('srBazarSelect');
             if (bazarSelect && assignedBazar) {
@@ -1063,7 +1096,6 @@ async function handleSRLogin(event) {
         alert(`❌ ভুল এসআর আইডি: "${userSrId}"\nকোনো ডাটা পাওয়া যায়নি।`);
     }
 }
-
 
 // অ্যাপ লোড হওয়ার সময় কল হবে
 document.addEventListener('DOMContentLoaded', () => {
