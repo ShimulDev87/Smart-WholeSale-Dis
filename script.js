@@ -535,6 +535,47 @@ function syncCategoriesGlobally(categories) {
     }
 }
 
+// SR অর্ডার কনফার্ম করার সময় এই ফাংশন কল হবে
+function processOrderAndDeductStock(cartItems) {
+    // cartItems = [{ id: 101, qty: 5 }, { id: 102, qty: 2 }]
+    
+    cartItems.forEach(cartItem => {
+        // ইনভেন্টরি থেকে প্রোডাক্ট খুঁজে বের করা
+        const product = products.find(p => p.id === cartItem.id);
+        
+        if (product) {
+            // 📉 চলতি স্টক কমানো (মূল স্টক অপরিবর্তিত থাকবে)
+            product.stock = Math.max(0, product.stock - cartItem.qty);
+        }
+    });
+
+    // ১. লোকালস্টোরেজে আপডেট প্রোডাক্ট ডাটা সেভ
+    saveProductsToLocalStorage();
+
+    // ২. ফায়ারবেস ক্লাউডে সাথে সাথে আপডেট পাঠানো (যাতে ম্যানেজারের স্ক্রিনে সাথে সাথে স্টক কমে যায়)
+    if (typeof syncMasterDataToCloud === 'function') {
+        syncMasterDataToCloud();
+    }
+
+    // ৩. UI রিফ্রেশ
+    if (typeof filterMgrProducts === 'function') filterMgrProducts();
+}
+
+function syncMasterDataToCloud() {
+    if (typeof firebase !== 'undefined' && firebase.database()) {
+        // কোম্পানির নাম অনুযায়ী ফায়ারবেসে আলাদা নোড তৈরি হবে
+        const safeCompanyName = (state.companyName || 'Smart Wholesale').replace(/[.#$\[\]]/g, "_");
+        
+        firebase.database().ref('companies/' + safeCompanyName + '/products').set(products)
+            .then(() => {
+                console.log("Firebase status: প্রোডাক্ট ও স্টক ক্লাউডে সফলভাবে সেভ হয়েছে।");
+            })
+            .catch((err) => {
+                console.error("Firebase Sync Error: ", err);
+            });
+    }
+}
+
 function renderCategorySettingsCheckboxes() {
     const container = document.getElementById('categorySettingsCheckboxArea');
     if (!container) return;
@@ -1638,9 +1679,13 @@ function saveBazarAndShops() {
 // ==========================================
 // অন্য যেকোনো ডিভাইসে লাইভ রুট ও দোকান সিঙ্ক হওয়ার ফাংশন
 // ==========================================
+// ==========================================
+// অন্য যেকোনো ডিভাইসে লাইভ রুট, দোকান ও প্রোডাক্ট স্টক সিঙ্ক হওয়ার ফাংশন
+// ==========================================
 function syncMasterDataFromCloud() {
     if (typeof db === 'undefined' || !db) return;
 
+    // 1️⃣ রুট ও দোকান ডাটা সিঙ্ক (আপনার আগের কোড)
     db.ref('routesData').on('value', (snap) => {
         if (snap.exists()) {
             routesData = snap.val() || {};
@@ -1659,6 +1704,18 @@ function syncMasterDataFromCloud() {
                     if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
                 }
             }
+        }
+    });
+
+    // 2️⃣ 🆕 প্রোডাক্ট ও লাইভ স্টক সিঙ্ক (নতুন যুক্ত করা হয়েছে)
+    db.ref('products').on('value', (snap) => {
+        if (snap.exists()) {
+            products = snap.val() || [];
+            localStorage.setItem('products', JSON.stringify(products));
+
+            // ম্যানেজার ইনভেন্টরি ও SR প্রোডাক্ট লিস্টের UI আপডেট
+            if (typeof filterMgrProducts === 'function') filterMgrProducts();
+            if (typeof renderSRProductList === 'function') renderSRProductList();
         }
     });
 }
