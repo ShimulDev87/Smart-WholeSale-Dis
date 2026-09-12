@@ -300,8 +300,22 @@ function saveCompanyNameGlobally(newName) {
 
 function logoutManager() {
     if (confirm('আপনি কি ম্যানেজার প্যানেল থেকে লগআউট করতে চান?')) {
+        // ১. ম্যানেজার সেশন ও কোম্পানির স্টোরেজ ক্লিয়ার
         sessionStorage.removeItem('isManagerLoggedIn');
-        showHomeView();
+        localStorage.removeItem('companyName');
+        localStorage.removeItem('selectedCategories');
+
+        // ২. স্টেট ও UI ডিফল্ট "Smart Wholesale"-এ রিসেট
+        state.companyName = "Smart Wholesale";
+        syncCompanyNameToUI("Smart Wholesale");
+        if (typeof ALL_BUSINESS_CATEGORIES !== 'undefined' && typeof syncCategoriesGlobally === 'function') {
+            syncCategoriesGlobally(ALL_BUSINESS_CATEGORIES);
+        }
+
+        // ৩. হোম পেজে ব্যাক করা
+        if (typeof showHomeView === 'function') {
+            showHomeView();
+        }
     }
 }
 
@@ -348,6 +362,7 @@ function applyOwnerConfig(owner) {
 
 
 // 🌐 ফায়ারবেজ থেকে কোম্পানির তথ্য সিঙ্ক ও সেশন সিকিউরিটি ফাংশন
+// 🌐 ফায়ারবেজ থেকে কোম্পানির তথ্য সিঙ্ক ও সেশন সিকিউরিটি ফাংশন
 function syncCompanyInfoFromCloud() {
     const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
     if (!firebaseDb) return;
@@ -359,22 +374,27 @@ function syncCompanyInfoFromCloud() {
         const isManagerLoggedIn = sessionStorage.getItem('isManagerLoggedIn') === 'true';
         const activeSR = localStorage.getItem('activeSR');
         
-        if (data && data.companyName) {
-            // ১. কেবল ব্যবহারকারী লগইন করা থাকলেই UI ও LocalStorage আপডেট হবে
-            if (isManagerLoggedIn || activeSR) {
-                state.companyName = data.companyName;
-                localStorage.setItem('companyName', data.companyName);
-                syncCompanyNameToUI(data.companyName);
+        // ❌ ইউজার লগইন না থাকলে জোরপূর্বক ডিফল্ট অ্যাপের নাম ("Smart Wholesale") দেখাবে
+        if (!isManagerLoggedIn && !activeSR) {
+            state.companyName = "Smart Wholesale";
+            syncCompanyNameToUI("Smart Wholesale");
+            return; // লগইন না থাকলে এখানেই কাজ শেষ!
+        }
 
-                if (data.categories && Array.isArray(data.categories)) {
-                    localStorage.setItem('selectedCategories', JSON.stringify(data.categories));
-                    if (typeof syncCategoriesGlobally === 'function') {
-                        syncCategoriesGlobally(data.categories);
-                    }
+        // ✅ কেবল ব্যবহারকারী (Manager বা SR) সফলভাবে লগইন করলেই ফায়ারবেজ থেকে কোম্পানির আসল নাম দেখাবে
+        if (data && data.companyName) {
+            state.companyName = data.companyName;
+            localStorage.setItem('companyName', data.companyName);
+            syncCompanyNameToUI(data.companyName);
+
+            if (data.categories && Array.isArray(data.categories)) {
+                localStorage.setItem('selectedCategories', JSON.stringify(data.categories));
+                if (typeof syncCategoriesGlobally === 'function') {
+                    syncCategoriesGlobally(data.categories);
                 }
             }
         } else {
-            // 🚀 ২. ফায়ারবেজে ডাটা না থাকলে কেবল ম্যানেজার লগইন থাকা পিসি থেকেই ডাটা আপলোড হবে
+            // 🚀 ফায়ারবেজে ডাটা না থাকলে কেবল ম্যানেজার পিসি থেকে ডাটা আপলোড হবে
             const owner = typeof getOwnerProfile === 'function' ? getOwnerProfile() : null;
             if (isManagerLoggedIn && owner && owner.companyName) {
                 firebaseDb.ref('companyInfo').set({
@@ -1956,7 +1976,6 @@ function syncOrdersFromCloud() {
     });
 }
 
-
 // ==========================================
 // 13. APP INITIALIZATION
 // ==========================================
@@ -1964,19 +1983,31 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDataFromLocalStorage();
     initializeDefaultProducts();
 
-    const owner = getOwnerProfile();
-    if (owner) {
-        state.companyName = owner.companyName;
-        syncCompanyNameToUI(owner.companyName);
-        syncCategoriesGlobally(owner.categories || []);
-    } else {
-        // 🆕 যদি অনার প্রফাইল না থাকে (যেমন: এসআর ডিভাইসে), লোকাল স্টোরেজের সেভ থাকা নাম দেখাবে
+    const isManagerLoggedIn = sessionStorage.getItem('isManagerLoggedIn') === 'true';
+    const activeSR = localStorage.getItem('activeSR');
+
+    // 🛡️ সেশন সিকিউরিটি চেক: ম্যানেজার বা এসআর কেউ লগইন আছে কিনা
+    if (isManagerLoggedIn) {
+        const owner = getOwnerProfile();
+        if (owner && owner.companyName) {
+            state.companyName = owner.companyName;
+            syncCompanyNameToUI(owner.companyName);
+            syncCategoriesGlobally(owner.categories || []);
+        }
+    } else if (activeSR) {
+        // এসআর লগইন অবস্থায় থাকলে তবেই ডাটা দেখাবে
         const savedCompanyName = localStorage.getItem('companyName');
         if (savedCompanyName) {
             state.companyName = savedCompanyName;
             syncCompanyNameToUI(savedCompanyName);
         }
-        syncCategoriesGlobally(ALL_BUSINESS_CATEGORIES);
+    } else {
+        // 🔒 লগইন করা না থাকলে জোরপূর্বক ডিফল্ট নাম "Smart Wholesale" দেখাবে
+        state.companyName = "Smart Wholesale";
+        syncCompanyNameToUI("Smart Wholesale");
+        if (typeof ALL_BUSINESS_CATEGORIES !== 'undefined') {
+            syncCategoriesGlobally(ALL_BUSINESS_CATEGORIES);
+        }
     }
 
     // ==========================================
