@@ -327,21 +327,23 @@
 
                     <!-- টেবিল হেডার ও ডাটা কলাম অ্যাডজাস্ট করা হয়েছে (৭টি কলাম) -->
                     <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
-                        <table class="table table-hover align-middle custom-table">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>ID</th>
-                                    <th>প্রোডাক্টের নাম</th>
-                                    <th>ক্যাটাগরি</th>
-                                    <th>ইউনিট (একক)</th>
-                                    <th>চলতি স্টক</th>
-                                    <th>পাইকারি মূল্য</th>
-                                    <th class="text-center">অ্যাকশন</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mgrProductTableBody"></tbody>
-                        </table>
-                    </div>
+    <table class="table table-hover align-middle custom-table">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>প্রোডাক্টের নাম</th>
+                <th>ক্যাটাগরি</th>
+                <th>ইউনিট (একক)</th>
+                <!-- 🆕 নতুন মূল স্টক কলাম যুক্ত করা হয়েছে -->
+                <th class="text-nowrap">মূল স্টক</th>
+                <th class="text-nowrap">চলতি স্টক</th>
+                <th>পাইকারি মূল্য</th>
+                <th class="text-center">অ্যাকশন</th>
+            </tr>
+        </thead>
+        <tbody id="mgrProductTableBody"></tbody>
+    </table>
+</div>
                 </div>
 
                 <!-- 2. Setup Tab Pane -->
@@ -672,93 +674,105 @@
     </div>
 
     <!-- Add / Edit Product Modal -->
-    <div class="modal fade" id="productFormModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title fw-bold" id="productModalTitle"><i class="fa-solid fa-box-open me-2"></i>প্রোডাক্ট যোগ / এডিট করুন</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="editProductId">
-                    
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">প্রোডাক্টের নাম:</label>
-                            <input type="text" id="modalProductName" class="form-control" list="productSuggestions" placeholder="নাম টাইপ করুন বা লিস্ট থেকে সিলেক্ট করুন">
-                            <datalist id="productSuggestions">
-                                <option value="মিনিকেট চাল">
-                                <option value="নাজিরশাইল চাল">
-                                <option value="মসুর ডাল">
-                                <option value="আটা">
-                                <option value="ময়দা">
-                                <option value="চিনি">
-                                <option value="লবণ">
-                                <option value="সুজি">
-                                <option value="সোয়াবিন তেল">
-                                <option value="সরিষার তেল">
-                                <option value="নাপা এক্সট্রা">
-                                <option value="সার্জেল ২০">
-                                <option value="ডেয়ারি মিল্ক চকলেট">
-                                <option value="এলইডি বাল্ব ১২W">
-                                <option value="এ৪ পেপার রিম">
-                            </datalist>
-                        </div>
+   <div class="modal fade" id="productFormModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="productModalTitle"><i class="fa-solid fa-box-open me-2"></i>প্রোডাক্ট যোগ / এডিট করুন</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editProductId">
+                
+                <div class="row g-3">
+                    <!-- প্রোডাক্ট নাম -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">প্রোডাক্টের নাম:</label>
+                        <input type="text" id="modalProductName" class="form-control" list="productSuggestions" placeholder="নাম টাইপ করুন বা লিস্ট থেকে সিলেক্ট করুন">
+                        <datalist id="productSuggestions">
+                            <option value="মিনিকেট চাল">
+                            <option value="নাজিরশাইল চাল">
+                            <option value="মসুর ডাল">
+                            <option value="আটা">
+                            <option value="ময়দা">
+                            <option value="চিনি">
+                            <option value="লবণ">
+                            <option value="সুজি">
+                            <option value="সোয়াবিন তেল">
+                            <option value="সরিষার তেল">
+                            <option value="নাপা এক্সট্রা">
+                            <option value="সার্জেল ২০">
+                            <option value="ডেয়ারি মিল্ক চকলেট">
+                            <option value="এলইডি বাল্ব ১২W">
+                            <option value="এ৪ পেপার রিম">
+                        </datalist>
+                    </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">ক্যাটাগরি:</label>
-                            <select id="modalProductCategory" class="form-select">
-                                <option value="মুদি ও খাদ্য">মুদি ও খাদ্য</option>
-                                <option value="ফার্মেসি">ফার্মেসি</option>
-                                <option value="কনফেকশনারি">কনফেকশনারি</option>
-                                <option value="ইলেক্ট্রনিক্স">ইলেক্ট্রনিক্স</option>
-                                <option value="স্টেশনারি">স্টেশনারি</option>
-                            </select>
-                        </div>
+                    <!-- ক্যাটাগরি -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">ক্যাটাগরি:</label>
+                        <select id="modalProductCategory" class="form-select">
+                            <option value="মুদি ও খাদ্য">মুদি ও খাদ্য</option>
+                            <option value="ফার্মেসি">ফার্মেসি</option>
+                            <option value="কনফেকশনারি">কনফেকশনারি</option>
+                            <option value="ইলেক্ট্রনিক্স">ইলেক্ট্রনিক্স</option>
+                            <option value="স্টেশনারি">স্টেশনারি</option>
+                        </select>
+                    </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">ইউনিট (একক):</label>
-                            <select id="modalProductUnit" class="form-select" onchange="toggleKgDropdown()">
-                                <option value="বস্তা">বস্তা</option>
-                                <option value="প্যাকেট">প্যাকেট</option>
-                                <option value="পিস">পিস</option>
-                                <option value="ডজন">ডজন</option>
-                                <option value="কেজি">কেজি</option>
-                                <option value="লিটার">লিটার</option>
-                            </select>
-                        </div>
+                    <!-- ইউনিট -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">ইউনিট (একক):</label>
+                        <select id="modalProductUnit" class="form-select" onchange="toggleKgDropdown()">
+                            <option value="বস্তা">বস্তা</option>
+                            <option value="প্যাকেট">প্যাকেট</option>
+                            <option value="পিস">পিস</option>
+                            <option value="ডজন">ডজন</option>
+                            <option value="কেজি">কেজি</option>
+                            <option value="লিটার">লিটার</option>
+                        </select>
+                    </div>
 
-                        <div class="col-md-4" id="kgDropdownWrapper">
-                            <label class="form-label fw-bold text-success">বস্তার ওজন (কেজি):</label>
-                            <select id="modalProductKgSelect" class="form-select border-success" onchange="handleCustomKgInput()">
-                                <option value="5 kg">5 kg</option>
-                                <option value="10 kg">10 kg</option>
-                                <option value="20 kg" selected>20 kg</option>
-                                <option value="30 kg">30 kg</option>
-                                <option value="50 kg">50 kg</option>
-                                <option value="CUSTOM">অন্যান্য (নিজেই লিখুন)</option>
-                            </select>
-                            <input type="text" id="modalCustomKgInput" class="form-control mt-2 d-none" placeholder="যেমন: 15 kg">
-                        </div>
+                    <!-- বস্তার ওজন -->
+                    <div class="col-md-6" id="kgDropdownWrapper">
+                        <label class="form-label fw-bold text-success">বস্তার ওজন (কেজি):</label>
+                        <select id="modalProductKgSelect" class="form-select border-success" onchange="handleCustomKgInput()">
+                            <option value="5 kg">5 kg</option>
+                            <option value="10 kg">10 kg</option>
+                            <option value="20 kg" selected>20 kg</option>
+                            <option value="30 kg">30 kg</option>
+                            <option value="50 kg">50 kg</option>
+                            <option value="CUSTOM">অন্যান্য (নিজেই লিখুন)</option>
+                        </select>
+                        <input type="text" id="modalCustomKgInput" class="form-control mt-2 d-none" placeholder="যেমন: 15 kg">
+                    </div>
 
-                        <div class="col-md-4" id="stockColWrapper">
-                            <label class="form-label fw-bold">স্টক (পরিমাণ):</label>
-                            <input type="number" id="modalProductStock" class="form-control" placeholder="যেমন: 100">
-                        </div>
+                    <!-- 🆕 মূল স্টক (মাসিক) -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-primary">মূল স্টক (মাসিক):</label>
+                        <input type="number" id="modalProductInitialStock" class="form-control border-primary" placeholder="যেমন: ৫০">
+                    </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">পাইকারি মূল্য (৳):</label>
-                            <input type="number" id="modalProductPrice" class="form-control" placeholder="যেমন: 350">
-                        </div>
+                    <!-- 📉 চলতি স্টক -->
+                    <div class="col-md-4" id="stockColWrapper">
+                        <label class="form-label fw-bold">চলতি স্টক:</label>
+                        <input type="number" id="modalProductStock" class="form-control" placeholder="যেমন: ৪৫">
+                    </div>
+
+                    <!-- 💰 পাইকারি মূল্য -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">পাইকারি মূল্য (৳):</label>
+                        <input type="number" id="modalProductPrice" class="form-control" placeholder="যেমন: ৩৫০">
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">বাতিল</button>
-                    <button type="button" class="btn btn-success rounded-pill px-4 fw-bold" onclick="saveProduct()"><i class="fa-solid fa-save me-1"></i> সেভ করুন</button>
-                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">বাতিল</button>
+                <button type="button" class="btn btn-success rounded-pill px-4 fw-bold" onclick="saveProduct()"><i class="fa-solid fa-save me-1"></i> সেভ করুন</button>
             </div>
         </div>
     </div>
+</div>
 
     <!-- Edit Company Name Modal -->
     <div class="modal fade" id="editCompanyModal" tabindex="-1" aria-hidden="true">

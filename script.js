@@ -140,13 +140,12 @@ let state = {
 let routesData = {};
 let products = [];
 let cart = [];
-
 const categoryList = [
-    { name: "মুদি ও খাদ্য", unit: "বস্তা", count: 10, baseNames: ["মিনিকেট চাল", "নাজিরশাইল চাল", "মসুর ডাল", "আটা", "ময়দা", "চিনি", "লবণ", "সুজি", "সোয়াবিন তেল", "সরিষার তেল"] },
-    { name: "ফার্মেসি", unit: "প্যাকেট", count: 8, baseNames: ["নাপা এক্সট্রা", "সেফ-৩", "সার্জেল ২০", "অ্যান্টাসিড প্লাস", "ফ্লেক্সো ১২০", "এজিথ্রোমাইসিন", "অমিপ্রাজল", "প্যারাসিটামল সিরাপ"] },
-    { name: "কনফেকশনারি", unit: "পিস", count: 6, baseNames: ["অলটাইম কেক", "ডেয়ারি মিল্ক চকলেট", "পটেটো চিপস", "মিষ্টার বিস্কুট", "ওয়েফার বার", "বুমবুম চিউয়িংগাম"] },
-    { name: "ইলেক্ট্রনিক্স", unit: "পিস", count: 5, baseNames: ["এলইডি বাল্ব ১২W", "মাল্টিপ্লাগ ৫গ্যাং", "সুইচ বোর্ড", "সিলিং ফ্যান", "চার্জার ক্যাবল টাইপ-সি"] },
-    { name: "স্টেশনারি", unit: "ডজন", count: 5, baseNames: ["এ৪ পেপার রিম", "মেটাডোর অলটাইম কলম", "পেন্সিল বক্স", "খাতা ১২০ পেজ", "ইরেজার প্যাক"] }
+    { name: "মুদি ও খাদ্য", unit: "বস্তা", count: 50, baseNames: ["মিনিকেট চাল", "নাজিরশাইল চাল", "মসুর ডাল", "আটা", "ময়দা", "চিনি", "লবণ", "সুজি", "সোয়াবিন তেল", "সরিষার তেল"] },
+    { name: "ফার্মেসি", unit: "প্যাকেট", count: 30, baseNames: ["নাপা এক্সট্রা", "সেফ-৩", "সার্জেল ২০", "অ্যান্টাসিড প্লাস", "ফ্লেক্সো ১২০", "এজিথ্রোমাইসিন", "অমিপ্রাজল", "প্যারাসিটামল সিরাপ"] },
+    { name: "কনফেকশনারি", unit: "পিস", count: 30, baseNames: ["অলটাইম কেক", "ডেয়ারি মিল্ক চকলেট", "পটেটো চিপস", "মিষ্টার বিস্কুট", "ওয়েফার বার", "বুমবুম চিউয়িংগাম"] },
+    { name: "ইলেক্ট্রনিক্স", unit: "পিস", count: 30, baseNames: ["এলইডি বাল্ব ১২W", "মাল্টিপ্লাগ ৫গ্যাং", "সুইচ বোর্ড", "সিলিং ফ্যান", "চার্জার ক্যাবল টাইপ-সি"] },
+    { name: "স্টেশনারি", unit: "ডজন", count: 30, baseNames: ["এ৪ পেপার রিম", "মেটাডোর অলটাইম কলম", "পেন্সিল বক্স", "খাতা ১২০ পেজ", "ইরেজার প্যাক"] }
 ];
 
 function initializeDefaultProducts() {
@@ -157,6 +156,10 @@ function initializeDefaultProducts() {
             const baseName = cat.baseNames[(i - 1) % cat.baseNames.length];
             let price = (baseName === "মিনিকেট চাল") ? 347 : Math.floor(Math.random() * 400) + 40;
             let kgValue = (cat.unit === "বস্তা") ? `${[5, 10, 20, 30][i % 4]} kg` : "";
+            
+            // 🆕 শুরুতে মূল স্টক ও চলতি স্টকের জন্য একই র্যান্ডম মান জেনারেট করা
+            const defaultStock = Math.floor(Math.random() * 150) + 20;
+
             products.push({
                 id: pId++,
                 name: `${baseName} (ভ্যারিয়েন্ট ${toBanglaNum(Math.ceil(i / 2))})`,
@@ -164,7 +167,8 @@ function initializeDefaultProducts() {
                 unit: cat.unit,
                 kg: kgValue,
                 price: price,
-                stock: Math.floor(Math.random() * 150) + 20
+                initialStock: defaultStock, // 🆕 মূল স্টক (স্থায়ী/মাসিক)
+                stock: defaultStock          // 📉 চলতি স্টক (অর্ডারে কমবে)
             });
         }
     });
@@ -625,20 +629,42 @@ function filterMgrProducts() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
+    // কলাম সংখ্যা এখন ৮টি
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">কোনো প্রোডাক্ট পাওয়া যায়নি!</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">কোনো প্রোডাক্ট পাওয়া যায়নি!</td></tr>';
         return;
     }
 
+    // 🗓️ বাংলা মাসের নাম ডায়নামিক বের করা (যেমন: সেপ্টেম্বর)
+    const currentMonthBN = new Date().toLocaleDateString('bn-BD', { month: 'long' });
+
     filtered.forEach(p => {
         let unitDisplay = p.unit === "বস্তা" ? `বস্তা (${p.kg ? p.kg : '20 kg'})` : p.unit;
+        
+        // মূল স্টক না থাকলে ডিফল্ট বর্তমান স্টক সেট হবে
+        const mainStock = p.initialStock !== undefined ? p.initialStock : p.stock;
+
         tbody.innerHTML += `
             <tr>
                 <td>#${p.id}</td>
                 <td class="fw-bold">${p.name}</td>
                 <td><span class="badge bg-secondary">${p.category}</span></td>
                 <td><span class="badge bg-light text-dark border">${unitDisplay}</span></td>
-                <td>${p.stock} টি</td>
+                
+                <!-- 🆕 মূল স্টক (স্থায়ী) -->
+                <td>
+                    <span class="badge bg-primary-subtle text-primary border border-primary px-2 py-1">
+                        ${mainStock} টি <small class="text-muted">(${currentMonthBN})</small>
+                    </span>
+                </td>
+
+                <!-- 📉 চলতি স্টক (SR-এর অর্ডারে কমবে) -->
+                <td>
+                    <span class="fw-bold ${p.stock <= 5 ? 'text-danger' : 'text-dark'}">
+                        ${p.stock} টি
+                    </span>
+                </td>
+
                 <td class="text-success fw-bold">৳ ${p.price}</td>
                 <td class="text-center">
                     <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditProductModal(${p.id})" title="এডিট করুন"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -646,6 +672,42 @@ function filterMgrProducts() {
                 </td>
             </tr>`;
     });
+}
+
+function saveEditedProduct(productId) {
+    const product = products.find(p => p.id === productId);
+    
+    if (product) {
+        // অন্যান্য ফিল্ড
+        product.name = document.getElementById('editProductName').value;
+        product.price = parseFloat(document.getElementById('editProductPrice').value);
+
+        // 📌 আপনার দেওয়া কোডটি ঠিক এখানে বসবে:
+        product.initialStock = parseInt(document.getElementById('editProductInitialStock').value) || product.stock;
+        product.stock = parseInt(document.getElementById('editProductCurrentStock').value);
+
+        // ডাটা লোকালস্টোরেজ ও ক্লাউডে সেভ করা
+        saveProductsToLocalStorage();
+        if (typeof syncMasterDataToCloud === 'function') syncMasterDataToCloud();
+
+        // টেবিল রিফ্রেশ ও মোডাল বন্ধ
+        filterMgrProducts();
+        hideModal('editProductModal');
+    }
+}
+
+// SR অর্ডার কনফার্ম করলে স্টক কমানোর নিয়ম
+function deductStockOnSROrder(productId, qtyOrdered) {
+    const product = products.find(p => p.id === productId);
+    if (product) {
+        // 🟢 শুধুমাত্র চলতি স্টক বিয়োগ হবে
+        product.stock = Math.max(0, product.stock - qtyOrdered);
+        
+        // 🔴 product.initialStock অপরিবর্তিত থাকবে (যেমন: ৫০ থেকে ৫ গেলে চলতি স্টক ৪৫ হবে, কিন্তু মূল স্টক ৫০-ই থাকবে)
+        
+        saveProductsToLocalStorage();
+        if (typeof syncMasterDataToCloud === 'function') syncMasterDataToCloud();
+    }
 }
 
 function toggleKgDropdown() {
@@ -681,7 +743,6 @@ function openAddProductModal() {
     toggleKgDropdown();
     showModal('productFormModal');
 }
-
 function openEditProductModal(id) {
     const p = products.find(item => item.id === id);
     if (!p) return;
@@ -704,11 +765,76 @@ function openEditProductModal(id) {
         }
     }
 
-    document.getElementById('modalProductStock').value = p.stock;
+    // 🆕 মূল স্টক সেট করা (যদি না থাকে তবে বর্তমান স্টকই মূল স্টক হিসেবে বসবে)
+    const initialStockInput = document.getElementById('modalProductInitialStock');
+    if (initialStockInput) {
+        initialStockInput.value = (p.initialStock !== undefined) ? p.initialStock : p.stock;
+    }
+
+    document.getElementById('modalProductStock').value = p.stock; // চলতি স্টক
     document.getElementById('modalProductPrice').value = p.price;
 
     toggleKgDropdown();
     showModal('productFormModal');
+}
+
+// ==========================================
+// প্রোডাক্ট তৈরি এবং এডিট সেভ করার ফাংশন
+// ==========================================
+function handleProductFormSubmit(e) {
+    e.preventDefault();
+
+    const editId = document.getElementById('editProductId').value;
+    const name = document.getElementById('modalProductName').value.trim();
+    const category = document.getElementById('modalProductCategory').value;
+    const unit = document.getElementById('modalProductUnit').value;
+    
+    // বস্তার কেজি হিসাব করা
+    let kg = "";
+    if (unit === "বস্তা") {
+        const kgSelect = document.getElementById('modalProductKgSelect').value;
+        kg = (kgSelect === "CUSTOM") ? document.getElementById('modalCustomKgInput').value : kgSelect;
+    }
+
+    // মূল স্টক ও চলতি স্টক রিড করা
+    const initialStockVal = parseInt(document.getElementById('modalProductInitialStock').value) || 0;
+    const currentStockVal = parseInt(document.getElementById('modalProductStock').value) || 0;
+    const priceVal = parseFloat(document.getElementById('modalProductPrice').value) || 0;
+
+    if (editId) {
+        // ✏️ প্রোডাক্ট এডিট মোড
+        const p = products.find(item => item.id == editId);
+        if (p) {
+            p.name = name;
+            p.category = category;
+            p.unit = unit;
+            p.kg = kg;
+            p.initialStock = initialStockVal; // ম্যানেজার নির্ধারিত মূল স্টক (মাসিক)
+            p.stock = currentStockVal;       // চলতি স্টক
+            p.price = priceVal;
+        }
+    } else {
+        // ➕ নতুন প্রোডাক্ট যোগ করা
+        const newProduct = {
+            id: Date.now(),
+            name: name,
+            category: category,
+            unit: unit,
+            kg: kg,
+            initialStock: initialStockVal,
+            stock: initialStockVal, // নতুন প্রোডাক্ট এডের সময় মূল স্টকই চলতি স্টক হিসেবে সেট হবে
+            price: priceVal
+        };
+        products.push(newProduct);
+    }
+
+    // লোকালস্টোরেজ ও ক্লাউডে ডাটা সেভ করা
+    saveProductsToLocalStorage();
+    if (typeof syncMasterDataToCloud === 'function') syncMasterDataToCloud();
+
+    // মোডাল বন্ধ ও টেবিল রিফ্রেশ
+    filterMgrProducts();
+    hideModal('productFormModal');
 }
 
 function saveProduct() {
@@ -2098,6 +2224,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDataFromLocalStorage();
     initializeDefaultProducts();
 
+    // 🆕 পূর্বে তৈরি হওয়া প্রোডাক্টগুলোতে initialStock না থাকলে তা সেট করা
+    if (Array.isArray(products)) {
+        products.forEach(p => {
+            if (p.initialStock === undefined) {
+                p.initialStock = p.stock; // পুরাতন প্রোডাক্টের চলতি স্টককেই মূল স্টক ধরা হবে
+            }
+        });
+    }
+
     const isManagerLoggedIn = sessionStorage.getItem('isManagerLoggedIn') === 'true';
     const activeSR = localStorage.getItem('activeSR');
 
@@ -2110,7 +2245,7 @@ document.addEventListener('DOMContentLoaded', () => {
             syncCategoriesGlobally(owner.categories || []);
         }
     } else if (activeSR) {
-        // 🚀 এসআর লগইন অবস্থায় কোম্পানির নাম ও ক্যাটাগরি লোড নিশ্চিত করা
+        // 🚀 এসআর লগইন অবস্থায় কোম্পানির নাম ও ক্যাটাগরি লোড নিশ্চিত করা
         const savedCompanyName = localStorage.getItem('companyName');
         if (savedCompanyName) {
             state.companyName = savedCompanyName;
@@ -2136,7 +2271,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadSRRoutesAndBazars();
     }
 
-    // 🚀 রোল অনুযায়ী UI ফিল্টার কল করা (ম্যানেজার কার্ড হাইড করা)
+    // 🚀 রোল অনুযায়ী UI ফিল্টার কল করা (ম্যানেজার কার্ড হাইড করা)
     if (typeof updateRoleBasedUI === 'function') {
         updateRoleBasedUI();
     }
