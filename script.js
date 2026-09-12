@@ -383,12 +383,19 @@ function syncCompanyInfoFromCloud() {
 }
 
 function syncCompanyNameToUI(name) {
-    const header = document.getElementById('displayCompanyName');
-    if (header) header.innerText = name;
-    const welcome = document.getElementById('welcomeCompanyName');
-    if (welcome) welcome.innerText = name;
-    const printName = document.getElementById('printCompanyName');
-    if (printName) printName.innerText = name;
+    if (!name) return;
+
+    // ১. পরিচিত সকল ID চেক করে নাম বসানো
+    const ids = ['displayCompanyName', 'welcomeCompanyName', 'printCompanyName', 'srCompanyName', 'headerCompanyName', 'appBrandTitle'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = name;
+    });
+
+    // ২. কোনো Class ব্যবহার করা থাকলে সেখানেও নাম আপডেট করা
+    document.querySelectorAll('.company-name-display, .brand-name').forEach(el => {
+        el.innerText = name;
+    });
 }
 
 function syncCategoriesGlobally(categories) {
