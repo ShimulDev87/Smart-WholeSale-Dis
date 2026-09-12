@@ -560,21 +560,52 @@ function processOrderAndDeductStock(cartItems) {
     // ৩. UI রিফ্রেশ
     if (typeof filterMgrProducts === 'function') filterMgrProducts();
 }
+// ==========================================
+// ক্লাউড থেকে রুট, দোকান এবং প্রোডাক্ট স্টক লাইভ সিঙ্ক করার ফাংশন
+// ==========================================
+function syncMasterDataFromCloud() {
+    // db অথবা firebase.database() নিশ্চিত করা
+    const database = (typeof db !== 'undefined' && db) ? db : (typeof firebase !== 'undefined' && firebase.database ? firebase.database() : null);
+    if (!database) return;
 
-function syncMasterDataToCloud() {
-    if (typeof firebase !== 'undefined' && firebase.database()) {
-        // কোম্পানির নাম অনুযায়ী ফায়ারবেসে আলাদা নোড তৈরি হবে
-        const safeCompanyName = (state.companyName || 'Smart Wholesale').replace(/[.#$\[\]]/g, "_");
-        
-        firebase.database().ref('companies/' + safeCompanyName + '/products').set(products)
-            .then(() => {
-                console.log("Firebase status: প্রোডাক্ট ও স্টক ক্লাউডে সফলভাবে সেভ হয়েছে।");
-            })
-            .catch((err) => {
-                console.error("Firebase Sync Error: ", err);
-            });
-    }
+    // সেফ কোম্পানি নেম ফরম্যাট
+    const safeCompanyName = (state.companyName || 'Smart Wholesale').replace(/[.#$\[\]]/g, "_");
+
+    // 1️⃣ কোম্পানির রুট ও দোকান ডাটা লাইভ সিঙ্ক
+    database.ref('companies/' + safeCompanyName + '/routesData').on('value', (snap) => {
+        if (snap.exists()) {
+            routesData = snap.val() || {};
+            localStorage.setItem('routesData', JSON.stringify(routesData));
+            
+            // ড্রপডাউন ও SR প্যানেল আপডেট
+            if (typeof updateRouteDropdowns === 'function') updateRouteDropdowns();
+            if (typeof populateSRRoutes === 'function') populateSRRoutes();
+
+            const srRoute = document.getElementById('srRouteSelect');
+            if (srRoute && srRoute.value) {
+                if (typeof onSRRouteSelect === 'function') onSRRouteSelect();
+                const srBazar = document.getElementById('srBazarSelect');
+                if (srBazar && srBazar.value !== "") {
+                    if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
+                }
+            }
+        }
+    });
+
+    // 2️⃣ 🆕 কোম্পানির প্রোডাক্ট ও লাইভ স্টক সিঙ্ক
+    database.ref('companies/' + safeCompanyName + '/products').on('value', (snap) => {
+        if (snap.exists()) {
+            products = snap.val() || [];
+            localStorage.setItem('products', JSON.stringify(products));
+
+            // ম্যানেজার ইনভেন্টরি ও SR প্রোডাক্ট প্যানেল রিয়েলটাইমে রিফ্রেশ
+            if (typeof filterMgrProducts === 'function') filterMgrProducts();
+            if (typeof renderSRProductList === 'function') renderSRProductList();
+        }
+    });
 }
+
+
 
 function renderCategorySettingsCheckboxes() {
     const container = document.getElementById('categorySettingsCheckboxArea');
@@ -2121,19 +2152,17 @@ function printDailySummary() {
         }, 500);
     }, 150);
 }
-
 // ==========================================
-// ৩. আপডেট করা generateDailySummary (স্মার্ট ম্যাচিং)
+// ৩. আপডেট করা generateDailySummary (স্মার্ট ম্যাচিং ও ফাস্ট রেন্ডার)
 // ==========================================
 function generateDailySummary() {
     try {
         const summaryTable = document.getElementById('dailySummaryTable');
         if (!summaryTable) return;
         if (!state || !state.orders) {
-            summaryTable.innerHTML = '<tr><td colspan="4" class="text-center text-danger">ডাটা লোড হয়নি!</td></tr>';
+            summaryTable.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-3">ডাটা লোড হয়নি!</td></tr>';
             return;
         }
-        summaryTable.innerHTML = '';
 
         const now = new Date();
         const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -2143,15 +2172,20 @@ function generateDailySummary() {
             document.getElementById('summaryDate').innerText = `তারিখ: ${todayDisplay}`;
         }
 
+        // 🛡️ সঠিক তারিখ ফিল্টারিং (Bug Fixed)
         const todaysOrders = state.orders.filter(order => {
             if (!order) return false;
-            if (order.isoDate) return order.isoDate === todayIso;
-            return true;
+            // isoDate থাকলে সেটা মেলাবে, নতুবা date ফিল্ড মেলাবে
+            const orderDate = order.isoDate || (order.date ? order.date.split('T')[0] : '');
+            return orderDate === todayIso;
         });
 
-        let totalOrders = todaysOrders.length, grandTotalAmount = 0, totalItemsCount = 0;
+        let totalOrders = todaysOrders.length;
+        let grandTotalAmount = 0;
+        let totalItemsCount = 0;
         let productSummaryMap = {};
 
+        // অর্ডারের ডাটা এগ্রিগেট করা
         todaysOrders.forEach(order => {
             grandTotalAmount += (parseFloat(order.totalAmount || order.total) || 0);
             if (order.items && Array.isArray(order.items)) {
@@ -2174,24 +2208,48 @@ function generateDailySummary() {
         if (keys.length === 0) {
             summaryTable.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">আজকের তারিখে কোনো কনফার্মড অর্ডার নেই।</td></tr>';
         } else {
+            let rowsHtml = '';
             keys.forEach(name => {
                 const item = productSummaryMap[name];
                 const totalItemPrice = item.qty * item.price;
                 totalItemsCount += item.qty;
-                summaryTable.innerHTML += `<tr>
+
+                const formattedQty = typeof toBanglaNum === 'function' ? toBanglaNum(item.qty) : item.qty;
+                const formattedPrice = typeof toBanglaNum === 'function' 
+                    ? toBanglaNum(totalItemPrice.toLocaleString('en-US')) 
+                    : totalItemPrice.toLocaleString('en-US');
+
+                rowsHtml += `<tr>
                     <td class="fw-bold">${name}</td>
                     <td><span class="badge bg-light text-dark border">${item.category}</span></td>
-                    <td class="fw-bold text-primary">${typeof toBanglaNum === 'function' ? toBanglaNum(item.qty) : item.qty} ${item.unit}</td>
-                    <td class="fw-bold text-success">৳ ${typeof toBanglaNum === 'function' ? toBanglaNum(totalItemPrice.toLocaleString('en-US')) : totalItemPrice}</td>
+                    <td class="fw-bold text-primary">${formattedQty} ${item.unit}</td>
+                    <td class="fw-bold text-success">৳ ${formattedPrice}</td>
                 </tr>`;
             });
+
+            // ⚡ ডমে একসাথে সব রো ইনসার্ট করা
+            summaryTable.innerHTML = rowsHtml;
         }
 
-        if (document.getElementById('summaryTotalOrders')) document.getElementById('summaryTotalOrders').innerText = typeof toBanglaNum === 'function' ? toBanglaNum(totalOrders) : totalOrders;
-        if (document.getElementById('summaryTotalAmount')) document.getElementById('summaryTotalAmount').innerText = `৳ ${typeof toBanglaNum === 'function' ? toBanglaNum(grandTotalAmount.toLocaleString('en-US')) : grandTotalAmount}`;
-        if (document.getElementById('summaryTotalItems')) document.getElementById('summaryTotalItems').innerText = `${typeof toBanglaNum === 'function' ? toBanglaNum(totalItemsCount) : totalItemsCount} টি`;
-    } catch (e) { console.error("Summary Error: ", e); }
+        // সামারি কার্ডের মোট মানগুলো আপডেট
+        if (document.getElementById('summaryTotalOrders')) {
+            document.getElementById('summaryTotalOrders').innerText = typeof toBanglaNum === 'function' ? toBanglaNum(totalOrders) : totalOrders;
+        }
+        if (document.getElementById('summaryTotalAmount')) {
+            const formattedGrandTotal = typeof toBanglaNum === 'function' 
+                ? toBanglaNum(grandTotalAmount.toLocaleString('en-US')) 
+                : grandTotalAmount.toLocaleString('en-US');
+            document.getElementById('summaryTotalAmount').innerText = `৳ ${formattedGrandTotal}`;
+        }
+        if (document.getElementById('summaryTotalItems')) {
+            document.getElementById('summaryTotalItems').innerText = `${typeof toBanglaNum === 'function' ? toBanglaNum(totalItemsCount) : totalItemsCount} টি`;
+        }
+
+    } catch (e) { 
+        console.error("Summary Error: ", e); 
+    }
 }
+
 
 // ==========================================
 // ৪. তারিখ অনুযায়ী গ্রুপ করা মেমো লিস্ট
