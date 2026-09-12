@@ -1988,10 +1988,6 @@ function saveOrderToCloud(orderData) {
     }
 }
 
-// ==========================================
-// ==========================================
-// ১. আপডেট করা submitOrder (স্টক ডিডাকশন ও লাইভ সামারি ফিক্সড)
-// ==========================================
 function submitOrder() {
     if (!cart || cart.length === 0) return alert("কার্টে কোনো প্রোডাক্ট যোগ করা হয়নি!");
     if (!selectedSRShop) return alert("কোনো দোকান নির্বাচন করা হয়নি!");
@@ -2009,15 +2005,9 @@ function submitOrder() {
     const orderTime = now.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
     
     // ডিভাইস নিরপেক্ষ ISO তারিখ (YYYY-MM-DD)
-    const dateInputValue = document.getElementById('orderDateInput')?.value;
-    let yyyy, mm, dd;
-    if (dateInputValue) {
-        [yyyy, mm, dd] = dateInputValue.split('-');
-    } else {
-        yyyy = now.getFullYear();
-        mm = String(now.getMonth() + 1).padStart(2, '0');
-        dd = String(now.getDate()).padStart(2, '0');
-    }
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
     
     const isoDate = `${yyyy}-${mm}-${dd}`;
     const displayDate = `${dd}/${mm}/${yyyy}`;
@@ -2042,40 +2032,42 @@ function submitOrder() {
         timestamp: now.getTime()
     };
 
-
-    // -----------------------------------------------------------
-    // 📉 🔴 [নতুন ফিক্স] ১. ইনভентরি থেকে চলতি স্টক কমিয়ে দেওয়া
-    // -----------------------------------------------------------
+    // 📉 🔴 ১. ইনভেন্টরি থেকে চলতি স্টক কমানো (Array সেফটি সহ)
+    let prodList = getArrayData(products);
+    
     cart.forEach(cartItem => {
-        // ID সংখ্যা বা স্ট্রিং যাই হোক না কেন মেলাবে
-        const product = products.find(p => String(p.id) === String(cartItem.id || cartItem.productId));
-        if (product) {
-            const qtyToDeduct = parseFloat(cartItem.qty || cartItem.quantity || 1);
-            // চলতি স্টক কমানো (০ এর নিচে নামবে না)
-            product.stock = Math.max(0, (parseFloat(product.stock) || 0) - qtyToDeduct);
+        const prodId = cartItem.id || cartItem.productId;
+        const targetProduct = prodList.find(p => p && String(p.id) === String(prodId));
+        
+        if (targetProduct) {
+            const qtyDeduct = parseFloat(cartItem.qty || cartItem.quantity || 1);
+            targetProduct.stock = Math.max(0, (parseFloat(targetProduct.stock) || 0) - qtyDeduct);
         }
     });
 
-    // 💾 ২. প্রোডাক্টের আপডেট করা স্টক লোকালস্টোরেজ ও ফায়ারবেসে সেভ
+    products = prodList; // আপডেট প্রোডাক্ট তালিকা সেট করা
+
+    // 💾 ২. সেভ লোকাল মেমোরি ও ক্লাউড
     if (typeof saveProductsToLocalStorage === 'function') saveProductsToLocalStorage();
     if (typeof syncMasterDataToCloud === 'function') syncMasterDataToCloud();
 
-    // 💾 ৩. অর্ডারের ডাটা লোকাল ও ক্লাউড সেভ
-    if (!Array.isArray(state.orders)) state.orders = [];
-    state.orders.push(newOrder);
+    if (!state.orders) state.orders = [];
+    let orderList = getArrayData(state.orders);
+    orderList.push(newOrder);
+    state.orders = orderList;
 
     if (typeof saveDataToLocalStorage === 'function') saveDataToLocalStorage();
-    saveOrderToCloud(newOrder);
+    if (typeof saveOrderToCloud === 'function') saveOrderToCloud(newOrder);
 
-    // 🔄 ৪. UI এবং সামারি শিট সাথে সাথে রিফ্রেশ করা
-    if (typeof filterMgrProducts === 'function') filterMgrProducts();     // ম্যানেজার স্টক টেবিল রিফ্রেশ
-    if (typeof renderSRProductList === 'function') renderSRProductList(); // SR প্রোডাক্ট কার্ড রিফ্রেশ
-    generateDailySummary();                                                // চালান সামারি শিট আপডেট
-    renderMemoList();                                                     // মেমো তালিকা আপডেট
+    // 🔄 ৩. রিফ্রেশ UI & সামারি শিট
+    if (typeof filterMgrProducts === 'function') filterMgrProducts();
+    if (typeof renderSRProductList === 'function') renderSRProductList();
+    generateDailySummary();
+    if (typeof renderMemoList === 'function') renderMemoList();
 
     alert(`অর্ডার সফলভাবে কনফার্ম করা হয়েছে! (${selectedSRShop})`);
 
-    // কার্ট ক্লিয়ার ও প্যানেল রিসেট
+    // কার্ট ক্লিয়ার
     cart = [];
     updateCartUI();
     document.getElementById('posSectionArea')?.classList.add('d-none');
@@ -2099,6 +2091,13 @@ function convertBnToEnNum(str) {
     if (!str) return '';
     const bnNums = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
     return str.toString().replace(/[০-৯]/g, d => bnNums.indexOf(d));
+}
+
+// 🛡️ ডাটা যেকোনো ফরম্যাটে আসুক না কেন Array নিশ্চিত করার ফাংশন
+function getArrayData(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data.filter(Boolean);
+    return Object.values(data);
 }
 
 // ==========================================
@@ -2176,6 +2175,8 @@ function printDailySummary() {
         }, 500);
     }, 150);
 }
+
+
 // ==========================================
 // ৩. আপডেট করা generateDailySummary (স্মার্ট ম্যাচিং ও ফাস্ট রেন্ডার)
 // ==========================================
@@ -2183,11 +2184,8 @@ function generateDailySummary() {
     try {
         const summaryTable = document.getElementById('dailySummaryTable');
         if (!summaryTable) return;
-        if (!state || !state.orders) {
-            summaryTable.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-3">ডাটা লোড হয়নি!</td></tr>';
-            return;
-        }
 
+        const allOrders = getArrayData(state?.orders);
         const now = new Date();
         const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const todayDisplay = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
@@ -2196,12 +2194,12 @@ function generateDailySummary() {
             document.getElementById('summaryDate').innerText = `তারিখ: ${todayDisplay}`;
         }
 
-        // 🛡️ সঠিক তারিখ ফিল্টারিং (Bug Fixed)
-        const todaysOrders = state.orders.filter(order => {
+        // 📅 আজ তৈরি সব অর্ডার ফিল্টার করা (isoDate বা date মেলাবে)
+        const todaysOrders = allOrders.filter(order => {
             if (!order) return false;
-            // isoDate থাকলে সেটা মেলাবে, নতুবা date ফিল্ড মেলাবে
-            const orderDate = order.isoDate || (order.date ? order.date.split('T')[0] : '');
-            return orderDate === todayIso;
+            if (order.isoDate) return order.isoDate === todayIso;
+            if (order.date) return order.date === todayDisplay;
+            return false;
         });
 
         let totalOrders = todaysOrders.length;
@@ -2209,23 +2207,24 @@ function generateDailySummary() {
         let totalItemsCount = 0;
         let productSummaryMap = {};
 
-        // অর্ডারের ডাটা এগ্রিগেট করা
         todaysOrders.forEach(order => {
             grandTotalAmount += (parseFloat(order.totalAmount || order.total) || 0);
-            if (order.items && Array.isArray(order.items)) {
-                order.items.forEach(item => {
-                    const itemQty = parseFloat(item.qty || item.quantity) || 0;
-                    if (!productSummaryMap[item.name]) {
-                        productSummaryMap[item.name] = { 
-                            category: item.category || 'সাধারণ', 
-                            qty: 0, 
-                            unit: item.displayUnit || item.unit || 'pcs', 
-                            price: parseFloat(item.price) || 0 
-                        };
-                    }
-                    productSummaryMap[item.name].qty += itemQty;
-                });
-            }
+            const items = getArrayData(order.items);
+            
+            items.forEach(item => {
+                const itemQty = parseFloat(item.qty || item.quantity) || 0;
+                const itemName = item.name || 'অজানা প্রোডাক্ট';
+                
+                if (!productSummaryMap[itemName]) {
+                    productSummaryMap[itemName] = { 
+                        category: item.category || 'সাধারণ', 
+                        qty: 0, 
+                        unit: item.displayUnit || item.unit || 'pcs', 
+                        price: parseFloat(item.price) || 0 
+                    };
+                }
+                productSummaryMap[itemName].qty += itemQty;
+            });
         });
 
         const keys = Object.keys(productSummaryMap);
@@ -2250,12 +2249,10 @@ function generateDailySummary() {
                     <td class="fw-bold text-success">৳ ${formattedPrice}</td>
                 </tr>`;
             });
-
-            // ⚡ ডমে একসাথে সব রো ইনসার্ট করা
             summaryTable.innerHTML = rowsHtml;
         }
 
-        // সামারি কার্ডের মোট মানগুলো আপডেট
+        // সামারি কার্ডের সংখ্যাগুলো আপডেট
         if (document.getElementById('summaryTotalOrders')) {
             document.getElementById('summaryTotalOrders').innerText = typeof toBanglaNum === 'function' ? toBanglaNum(totalOrders) : totalOrders;
         }
@@ -2270,7 +2267,7 @@ function generateDailySummary() {
         }
 
     } catch (e) { 
-        console.error("Summary Error: ", e); 
+        console.error("Summary Generation Error: ", e); 
     }
 }
 
