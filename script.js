@@ -1573,6 +1573,47 @@ function selectShopFromGrid(shopName, index) {
     if (posArea) posArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// 🚚 এসআর প্যানেলে রুট ও বাজার লোড করার ফাংশন
+function loadSRRoutesAndBazars() {
+    // LocalStorage বা State থেকে রুট ডাটা নেওয়া
+    const routesData = state.routes || JSON.parse(localStorage.getItem('routesData') || '[]');
+    
+    // এসআর প্যানেলের রুট ও বাজার ড্রপডাউন এলিমেন্ট (আপনার HTML ID অনুযায়ী)
+    const srRouteSelect = document.getElementById('srRouteSelect') || document.getElementById('orderRouteSelect');
+    
+    if (!srRouteSelect) return;
+
+    // ড্রপডাউন রিমুভ ও ডিফল্ট অপশন সেট
+    srRouteSelect.innerHTML = '<option value="">-- রুট নির্বাচন করুন --</option>';
+
+    if (Array.isArray(routesData) && routesData.length > 0) {
+        routesData.forEach(routeObj => {
+            const routeName = typeof routeObj === 'string' ? routeObj : routeObj.name;
+            const opt = document.createElement('option');
+            opt.value = routeName;
+            opt.textContent = routeName;
+            srRouteSelect.appendChild(opt);
+        });
+    }
+
+    // যদি এসআর-এর নির্দিষ্ট রুট অ্যাসাইন করা থাকে
+    const activeSRRaw = localStorage.getItem('activeSR');
+    if (activeSRRaw) {
+        try {
+            const activeSR = JSON.parse(activeSRRaw);
+            if (activeSR && activeSR.route) {
+                srRouteSelect.value = activeSR.route;
+                // বাজার লোডের ফাংশন ট্র্রিগার করা
+                if (typeof loadSRBazarList === 'function') {
+                    loadSRBazarList(activeSR.route);
+                }
+            }
+        } catch (e) {
+            // string id হলে ইগনোর করবে
+        }
+    }
+}
+
 function resetShopSelection() {
     resetProductPricesToDefault();
     selectedSRShop = null;
@@ -2050,6 +2091,9 @@ function syncOrdersFromCloud() {
 // ==========================================
 // 13. APP INITIALIZATION
 // ==========================================
+// ==========================================
+// 13. APP INITIALIZATION
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     loadDataFromLocalStorage();
     initializeDefaultProducts();
@@ -2057,7 +2101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isManagerLoggedIn = sessionStorage.getItem('isManagerLoggedIn') === 'true';
     const activeSR = localStorage.getItem('activeSR');
 
-    // 🛡️ সেশন সিকিউরিটি চেক: ম্যানেজার বা এসআর কেউ লগইন আছে কিনা
+    // 🛡️ সেশন সিকিউরিটি ও ডাটা লোড চেক
     if (isManagerLoggedIn) {
         const owner = getOwnerProfile();
         if (owner && owner.companyName) {
@@ -2066,14 +2110,20 @@ document.addEventListener('DOMContentLoaded', () => {
             syncCategoriesGlobally(owner.categories || []);
         }
     } else if (activeSR) {
-        // এসআর লগইন অবস্থায় থাকলে তবেই ডাটা দেখাবে
+        // 🚀 এসআর লগইন অবস্থায় কোম্পানির নাম ও ক্যাটাগরি লোড নিশ্চিত করা
         const savedCompanyName = localStorage.getItem('companyName');
         if (savedCompanyName) {
             state.companyName = savedCompanyName;
             syncCompanyNameToUI(savedCompanyName);
         }
+        
+        // ওনারের ক্যাটাগরি সিঙ্ক (যদি সেভ করা থাকে)
+        const owner = getOwnerProfile();
+        if (owner && owner.categories) {
+            syncCategoriesGlobally(owner.categories);
+        }
     } else {
-        // 🔒 লগইন করা না থাকলে জোরপূর্বক ডিফল্ট নাম "Smart Wholesale" দেখাবে
+        // 🔒 সাধারণ ভিজিটরদের জন্য ডিফল্ট ব্র্যান্ডিং
         state.companyName = "Smart Wholesale";
         syncCompanyNameToUI("Smart Wholesale");
         if (typeof ALL_BUSINESS_CATEGORIES !== 'undefined') {
@@ -2081,7 +2131,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 🚀 পেজ লোড বা রিফ্রেশ হলে SR বনাম Manager এর UI ফিল্টার কল করা
+    // 🚚 এসআর অর্ডার প্যানেলের রুট ও বাজার ড্রপডাউন লোড করা
+    if (typeof loadSRRoutesAndBazars === 'function') {
+        loadSRRoutesAndBazars();
+    }
+
+    // 🚀 রোল অনুযায়ী UI ফিল্টার কল করা (ম্যানেজার কার্ড হাইড করা)
     if (typeof updateRoleBasedUI === 'function') {
         updateRoleBasedUI();
     }
@@ -2092,8 +2147,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof syncSRsFromCloud === 'function') syncSRsFromCloud();
     if (typeof syncMasterDataFromCloud === 'function') syncMasterDataFromCloud();
     if (typeof syncOrdersFromCloud === 'function') syncOrdersFromCloud();
-    
-    // 🆕 ক্লাউড থেকে কোম্পানির নাম ও ক্যাটাগরি সিঙ্ক করার লিসেনার
     if (typeof syncCompanyInfoFromCloud === 'function') syncCompanyInfoFromCloud();
 
     // সার্ভিস ওয়ার্কার রেজিস্টার (PWA support)
