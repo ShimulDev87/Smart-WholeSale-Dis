@@ -1975,20 +1975,22 @@ function updateCartUI() {
 
 
 // ==========================================
-// অর্ডার/মেমো ফায়ারবেজ ক্লাউডে সেভ করার ফাংশন
+// অর্ডার/মেমো ফায়ারবেজ ক্লাউডে সেভ করার ফাংশন (মাল্টি-টেন্যান্ট ফিক্সড)
 // ==========================================
 function saveOrderToCloud(orderData) {
     if (typeof db !== 'undefined' && db && orderData) {
-        db.ref('orders/' + orderData.id).set(orderData)
+        // কোম্পানির নাম অনুযায়ী ফায়ারবেসে সেভ করা
+        const safeCompanyName = (state.companyName || 'Smart Wholesale').replace(/[.#$\[\]]/g, "_");
+        
+        db.ref('companies/' + safeCompanyName + '/orders/' + orderData.id).set(orderData)
             .then(() => console.log("✅ অর্ডার ক্লাউডে সফলভাবে সেভ হয়েছে!"))
             .catch(err => console.error("❌ Order Cloud Save Error:", err));
     }
 }
 
-
-
 // ==========================================
-// ১. আপডেট করা submitOrder (টাইমজোন ও তারিখ ফিক্সড)
+// ==========================================
+// ১. আপডেট করা submitOrder (স্টক ডিডাকশন ও লাইভ সামারি ফিক্সড)
 // ==========================================
 function submitOrder() {
     if (!cart || cart.length === 0) return alert("কার্টে কোনো প্রোডাক্ট যোগ করা হয়নি!");
@@ -2040,18 +2042,40 @@ function submitOrder() {
         timestamp: now.getTime()
     };
 
+
+    // -----------------------------------------------------------
+    // 📉 🔴 [নতুন ফিক্স] ১. ইনভентরি থেকে চলতি স্টক কমিয়ে দেওয়া
+    // -----------------------------------------------------------
+    cart.forEach(cartItem => {
+        // ID সংখ্যা বা স্ট্রিং যাই হোক না কেন মেলাবে
+        const product = products.find(p => String(p.id) === String(cartItem.id || cartItem.productId));
+        if (product) {
+            const qtyToDeduct = parseFloat(cartItem.qty || cartItem.quantity || 1);
+            // চলতি স্টক কমানো (০ এর নিচে নামবে না)
+            product.stock = Math.max(0, (parseFloat(product.stock) || 0) - qtyToDeduct);
+        }
+    });
+
+    // 💾 ২. প্রোডাক্টের আপডেট করা স্টক লোকালস্টোরেজ ও ফায়ারবেসে সেভ
+    if (typeof saveProductsToLocalStorage === 'function') saveProductsToLocalStorage();
+    if (typeof syncMasterDataToCloud === 'function') syncMasterDataToCloud();
+
+    // 💾 ৩. অর্ডারের ডাটা লোকাল ও ক্লাউড সেভ
     if (!Array.isArray(state.orders)) state.orders = [];
     state.orders.push(newOrder);
 
-    // লোকাল ও ফায়ারবেজ সেভ
-    saveDataToLocalStorage();
+    if (typeof saveDataToLocalStorage === 'function') saveDataToLocalStorage();
     saveOrderToCloud(newOrder);
 
-    generateDailySummary();
-    renderMemoList();
+    // 🔄 ৪. UI এবং সামারি শিট সাথে সাথে রিফ্রেশ করা
+    if (typeof filterMgrProducts === 'function') filterMgrProducts();     // ম্যানেজার স্টক টেবিল রিফ্রেশ
+    if (typeof renderSRProductList === 'function') renderSRProductList(); // SR প্রোডাক্ট কার্ড রিফ্রেশ
+    generateDailySummary();                                                // চালান সামারি শিট আপডেট
+    renderMemoList();                                                     // মেমো তালিকা আপডেট
 
     alert(`অর্ডার সফলভাবে কনফার্ম করা হয়েছে! (${selectedSRShop})`);
 
+    // কার্ট ক্লিয়ার ও প্যানেল রিসেট
     cart = [];
     updateCartUI();
     document.getElementById('posSectionArea')?.classList.add('d-none');
@@ -2330,16 +2354,14 @@ function syncOrdersFromCloud() {
 }
 
 // ==========================================
-// 13. APP INITIALIZATION
-// ==========================================
-// ==========================================
-// 13. APP INITIALIZATION
+// 13. APP INITIALIZATION (আপডেট ও নিরাপদ ভার্সন)
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
+    // ১. লোকালস্টোরেজ থেকে প্রাথমিক ডাটা লোড
     loadDataFromLocalStorage();
     initializeDefaultProducts();
 
-    // 🆕 পূর্বে তৈরি হওয়া প্রোডাক্টগুলোতে initialStock না থাকলে তা সেট করা
+    // 🆕 পূর্বে তৈরি হওয়া প্রোডাক্টগুলোতে initialStock না থাকলে তা সেট করা
     if (Array.isArray(products)) {
         products.forEach(p => {
             if (p.initialStock === undefined) {
@@ -2392,14 +2414,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // ফায়ারবেজ রিয়েলটাইম ক্লাউড লিসেনার সমুহ
+    // 🎨 🖥️ প্রাথমিক UI রেন্ডারিং (পেজ লোডেই ডাটা দেখানোর জন্য)
+    // ==========================================
+    if (typeof filterMgrProducts === 'function') filterMgrProducts();         // ম্যানেজার ইনভেন্টরি টেবিল
+    if (typeof renderSRProductList === 'function') renderSRProductList();     // SR প্যানেলের প্রোডাক্ট লিস্ট
+    if (typeof generateDailySummary === 'function') generateDailySummary();   // আজকের চালান সামারি শিট
+    if (typeof renderMemoList === 'function') renderMemoList();               // মেমো তালিকা
+
+    // ==========================================
+    // 📡 ফায়ারবেজ রিয়েলটাইম ক্লাউড লিসেনার সমূহ
     // ==========================================
     if (typeof syncSRsFromCloud === 'function') syncSRsFromCloud();
     if (typeof syncMasterDataFromCloud === 'function') syncMasterDataFromCloud();
     if (typeof syncOrdersFromCloud === 'function') syncOrdersFromCloud();
     if (typeof syncCompanyInfoFromCloud === 'function') syncCompanyInfoFromCloud();
 
-    // সার্ভিস ওয়ার্কার রেজিস্টার (PWA support)
+    // 📱 সার্ভিস ওয়ার্কার রেজিস্টার (PWA support)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
             .catch(err => console.log('Service Worker Warning:', err));
