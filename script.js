@@ -1988,99 +1988,124 @@ function saveOrderToCloud(orderData) {
     }
 }
 
+// ==========================================
+// ১. সম্পূর্ণ নিরাপদ submitOrder (সব বাগ ফিক্সড)
+// ==========================================
 function submitOrder() {
-    if (!cart || cart.length === 0) return alert("কার্টে কোনো প্রোডাক্ট যোগ করা হয়নি!");
-    if (!selectedSRShop) return alert("কোনো দোকান নির্বাচন করা হয়নি!");
+    try {
+        if (!cart || cart.length === 0) return alert("কার্টে কোনো প্রোডাক্ট যোগ করা হয়নি!");
+        if (!selectedSRShop) return alert("কোনো দোকান নির্বাচন করা হয়নি!");
 
-    const srName = document.getElementById('srNameInput')?.value.trim() || 'এসআর';
-    const route = document.getElementById('srRouteSelect').value;
-    const bazarIndex = document.getElementById('srBazarSelect').value;
+        const srName = document.getElementById('srNameInput')?.value.trim() || 'এসআর';
+        const route = document.getElementById('srRouteSelect')?.value || '';
+        const bazarIndex = document.getElementById('srBazarSelect')?.value || '';
 
-    let bazarName = '';
-    if (routesData && routesData[route] && routesData[route].bazars) {
-        bazarName = routesData[route].bazars[bazarIndex] || '';
-    }
-
-    const now = new Date();
-    const orderTime = now.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
-    
-    // ডিভাইস নিরপেক্ষ ISO তারিখ (YYYY-MM-DD)
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    
-    const isoDate = `${yyyy}-${mm}-${dd}`;
-    const displayDate = `${dd}/${mm}/${yyyy}`;
-    const dayName = now.toLocaleDateString('bn-BD', { weekday: 'long' });
-
-    const totalAmount = cart.reduce((sum, item) => sum + (item.price * (item.qty || 1)), 0);
-
-    const newOrder = {
-        id: 'ORD-' + Date.now(),
-        srName: srName,
-        shopName: selectedSRShop,
-        shop: selectedSRShop,
-        route: route,
-        market: bazarName,
-        items: JSON.parse(JSON.stringify(cart)),
-        totalAmount: totalAmount,
-        total: totalAmount,
-        time: orderTime,
-        date: displayDate,
-        isoDate: isoDate,
-        dayName: dayName,
-        timestamp: now.getTime()
-    };
-
-    // 📉 🔴 ১. ইনভেন্টরি থেকে চলতি স্টক কমানো (Array সেফটি সহ)
-    let prodList = getArrayData(products);
-    
-    cart.forEach(cartItem => {
-        const prodId = cartItem.id || cartItem.productId;
-        const targetProduct = prodList.find(p => p && String(p.id) === String(prodId));
-        
-        if (targetProduct) {
-            const qtyDeduct = parseFloat(cartItem.qty || cartItem.quantity || 1);
-            targetProduct.stock = Math.max(0, (parseFloat(targetProduct.stock) || 0) - qtyDeduct);
+        let bazarName = '';
+        if (typeof routesData !== 'undefined' && routesData && routesData[route] && routesData[route].bazars) {
+            bazarName = routesData[route].bazars[bazarIndex] || '';
         }
-    });
 
-    products = prodList; // আপডেট প্রোডাক্ট তালিকা সেট করা
+        const now = new Date();
+        const orderTime = now.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
+        
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        
+        const isoDate = `${yyyy}-${mm}-${dd}`;
+        const displayDate = `${dd}/${mm}/${yyyy}`;
+        const dayName = now.toLocaleDateString('bn-BD', { weekday: 'long' });
 
-    // 💾 ২. সেভ লোকাল মেমোরি ও ক্লাউড
-    if (typeof saveProductsToLocalStorage === 'function') saveProductsToLocalStorage();
-    if (typeof syncMasterDataToCloud === 'function') syncMasterDataToCloud();
+        const totalAmount = cart.reduce((sum, item) => sum + ((parseFloat(item.price) || 0) * (parseFloat(item.qty || item.quantity) || 1)), 0);
 
-    if (!state.orders) state.orders = [];
-    let orderList = getArrayData(state.orders);
-    orderList.push(newOrder);
-    state.orders = orderList;
+        const newOrder = {
+            id: 'ORD-' + Date.now(),
+            srName: srName,
+            shopName: selectedSRShop,
+            shop: selectedSRShop,
+            route: route,
+            market: bazarName,
+            items: JSON.parse(JSON.stringify(cart)),
+            totalAmount: totalAmount,
+            total: totalAmount,
+            time: orderTime,
+            date: displayDate,
+            isoDate: isoDate,
+            dayName: dayName,
+            timestamp: now.getTime()
+        };
 
-    if (typeof saveDataToLocalStorage === 'function') saveDataToLocalStorage();
-    if (typeof saveOrderToCloud === 'function') saveOrderToCloud(newOrder);
+        // --------------------------------------------------------
+        // 📉 ১. চলতি স্টক কমানো (ID এবং Name দুটি দিয়েই সেফ চেক)
+        // --------------------------------------------------------
+        if (typeof products !== 'undefined' && Array.isArray(products)) {
+            cart.forEach(cartItem => {
+                const itemQty = parseFloat(cartItem.qty || cartItem.quantity) || 0;
+                const itemId = cartItem.id || cartItem.productId;
+                const itemName = cartItem.name ? cartItem.name.trim().toLowerCase() : '';
 
-    // 🔄 ৩. রিফ্রেশ UI & সামারি শিট
-    if (typeof filterMgrProducts === 'function') filterMgrProducts();
-    if (typeof renderSRProductList === 'function') renderSRProductList();
-    generateDailySummary();
-    if (typeof renderMemoList === 'function') renderMemoList();
+                // প্রথমে ID দিয়ে খোঁজা হবে, না পেলে Name দিয়ে খোঁজা হবে
+                const targetProduct = products.find(p => {
+                    if (!p) return false;
+                    const matchId = (p.id !== undefined && itemId !== undefined && String(p.id) === String(itemId));
+                    const matchName = (p.name && itemName && p.name.trim().toLowerCase() === itemName);
+                    return matchId || matchName;
+                });
 
-    alert(`অর্ডার সফলভাবে কনফার্ম করা হয়েছে! (${selectedSRShop})`);
+                if (targetProduct) {
+                    const currentStock = parseFloat(targetProduct.stock) || 0;
+                    targetProduct.stock = Math.max(0, currentStock - itemQty);
+                }
+            });
 
-    // কার্ট ক্লিয়ার
-    cart = [];
-    updateCartUI();
-    document.getElementById('posSectionArea')?.classList.add('d-none');
-    
-    const shopGrid = document.getElementById('srShopGridArea');
-    if (shopGrid) shopGrid.classList.remove('d-none');
+            // লোকালস্টোরেজে আপডেট প্রোডাক্ট সেভ
+            localStorage.setItem('products', JSON.stringify(products));
+        }
 
-    selectedSRShop = null;
-    onSRBazarSelect();
-    resetProductPricesToDefault();
+        // --------------------------------------------------------
+        // 💾 ২. অর্ডারের ডাটা state ও LocalStorage-এ সেভ
+        // --------------------------------------------------------
+        if (typeof state === 'undefined') window.state = {};
+        if (!Array.isArray(state.orders)) state.orders = [];
+        
+        state.orders.push(newOrder);
+        localStorage.setItem('orders', JSON.stringify(state.orders));
 
-    if (typeof confetti === 'function') {
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        // 🌐 ৩. ফায়ারবেস ক্লাউড সেভ (নিরাপদ কল)
+        if (typeof saveOrderToCloud === 'function') {
+            try { saveOrderToCloud(newOrder); } catch (e) { console.error("Cloud Order Sync Error:", e); }
+        }
+        if (typeof syncMasterDataToCloud === 'function') {
+            try { syncMasterDataToCloud(); } catch (e) { console.error("Cloud Product Sync Error:", e); }
+        }
+
+        // --------------------------------------------------------
+        // 🔄 ৪. UI, মেমো এবং সামারি শিট রিয়েলটাইম আপডেট
+        // --------------------------------------------------------
+        if (typeof filterMgrProducts === 'function') filterMgrProducts();
+        if (typeof renderSRProductList === 'function') renderSRProductList();
+        if (typeof renderMemoList === 'function') renderMemoList();
+        if (typeof generateDailySummary === 'function') generateDailySummary();
+
+        alert(`অর্ডার সফলভাবে কনফার্ম করা হয়েছে! (${selectedSRShop})`);
+
+        // কার্ট ক্লিয়ার ও প্যানেল রিসেট
+        cart = [];
+        if (typeof updateCartUI === 'function') updateCartUI();
+        document.getElementById('posSectionArea')?.classList.add('d-none');
+        document.getElementById('srShopGridArea')?.classList.remove('d-none');
+
+        selectedSRShop = null;
+        if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
+        if (typeof resetProductPricesToDefault === 'function') resetProductPricesToDefault();
+
+        if (typeof confetti === 'function') {
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
+
+    } catch (criticalError) {
+        console.error("Critical Submit Order Error: ", criticalError);
+        alert("অর্ডার সেভ করার সময় সমস্যা হয়েছে: " + criticalError.message);
     }
 }
 
@@ -2180,21 +2205,36 @@ function printDailySummary() {
 // ==========================================
 // ৩. আপডেট করা generateDailySummary (স্মার্ট ম্যাচিং ও ফাস্ট রেন্ডার)
 // ==========================================
+// ==========================================
+// ২. আপডেট করা generateDailySummary
+// ==========================================
 function generateDailySummary() {
     try {
         const summaryTable = document.getElementById('dailySummaryTable');
         if (!summaryTable) return;
 
-        const allOrders = getArrayData(state?.orders);
+        // state.orders অথবা localStorage থেকে ডাটা সংগ্রহ
+        let allOrders = [];
+        if (typeof state !== 'undefined' && Array.isArray(state.orders) && state.orders.length > 0) {
+            allOrders = state.orders;
+        } else {
+            const localOrders = localStorage.getItem('orders');
+            if (localOrders) allOrders = JSON.parse(localOrders) || [];
+        }
+
         const now = new Date();
-        const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        const todayDisplay = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        
+        const todayIso = `${yyyy}-${mm}-${dd}`;
+        const todayDisplay = `${dd}/${mm}/${yyyy}`;
 
         if (document.getElementById('summaryDate')) {
             document.getElementById('summaryDate').innerText = `তারিখ: ${todayDisplay}`;
         }
 
-        // 📅 আজ তৈরি সব অর্ডার ফিল্টার করা (isoDate বা date মেলাবে)
+        // আজকের অর্ডার ফিল্টার
         const todaysOrders = allOrders.filter(order => {
             if (!order) return false;
             if (order.isoDate) return order.isoDate === todayIso;
@@ -2209,7 +2249,7 @@ function generateDailySummary() {
 
         todaysOrders.forEach(order => {
             grandTotalAmount += (parseFloat(order.totalAmount || order.total) || 0);
-            const items = getArrayData(order.items);
+            const items = Array.isArray(order.items) ? order.items : [];
             
             items.forEach(item => {
                 const itemQty = parseFloat(item.qty || item.quantity) || 0;
@@ -2252,7 +2292,7 @@ function generateDailySummary() {
             summaryTable.innerHTML = rowsHtml;
         }
 
-        // সামারি কার্ডের সংখ্যাগুলো আপডেট
+        // মোট হিসাব কার্ড আপডেট
         if (document.getElementById('summaryTotalOrders')) {
             document.getElementById('summaryTotalOrders').innerText = typeof toBanglaNum === 'function' ? toBanglaNum(totalOrders) : totalOrders;
         }
