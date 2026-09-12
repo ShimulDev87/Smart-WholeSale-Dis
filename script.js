@@ -320,6 +320,8 @@ function loadManagerPanelData() {
 
 function applyOwnerConfig(owner) {
     if (!owner) return;
+
+    // ১. লোকাল স্টেট ও স্টোরেজ আপডেট
     state.companyName = owner.companyName;
     localStorage.setItem('companyName', owner.companyName);
     syncCompanyNameToUI(owner.companyName);
@@ -327,17 +329,19 @@ function applyOwnerConfig(owner) {
     syncCategoriesGlobally(owner.categories || []);
     if (typeof saveDataToLocalStorage === 'function') saveDataToLocalStorage();
 
-    // 🚀 ফায়ারবেজ ক্লাউডে কোম্পানির তথ্য অটো-সেভ
+    // 🚀 ২. ফায়ারবেজে নতুন নাম ও তথ্য ওভাররাইট/সেভ করা
     const firebaseDb = (typeof database !== 'undefined') ? database : ((typeof db !== 'undefined') ? db : null);
-    if (firebaseDb) {
+    if (firebaseDb && owner.companyName) {
         firebaseDb.ref('companyInfo').set({
             companyName: owner.companyName,
+            ownerName: owner.ownerName || '',
+            phone: owner.phone || '',
             categories: owner.categories || [],
             updatedAt: new Date().toISOString()
         }).then(() => {
-            console.log("✅ ফায়ারবেজে কোম্পানির তথ্য সফলভাবে আপডেট হয়েছে!");
+            console.log("✅ ফায়ারবেজে সফলভাবে কোম্পানির নাম সেভ হয়েছে:", owner.companyName);
         }).catch(err => {
-            console.error("❌ ফায়ারবেজে আপলোড এরর:", err);
+            console.error("❌ ফায়ারবেজ সেভ এরর:", err);
         });
     }
 }
