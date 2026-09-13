@@ -240,19 +240,212 @@
     </div>
 
     <!-- MANAGER / OWNER PANEL VIEW -->
-    <div id="manager-view" class="view-section d-none">
-        <div class="glass-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold text-primary m-0"><i class="fa-solid fa-user-gear me-2"></i>ম্যানেজার / ওনার কন্ট্রোল প্যানেল</h5>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="logoutManager()"><i class="fa-solid fa-right-from-bracket me-1"></i> লগআউট</button>
-                    <button class="btn btn-sm btn-secondary rounded-pill" onclick="showHomeView()"><i class="fa-solid fa-arrow-left me-1"></i> হোম</button>
+<div id="manager-view" class="view-section d-none">
+    <div class="glass-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-primary m-0"><i class="fa-solid fa-user-gear me-2"></i>ম্যানেজার / ওনার কন্ট্রোল প্যানেল</h5>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="logoutManager()"><i class="fa-solid fa-right-from-bracket me-1"></i> লগআউট</button>
+                <button class="btn btn-sm btn-secondary rounded-pill" onclick="showHomeView()"><i class="fa-solid fa-arrow-left me-1"></i> হোম</button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="p-2 mb-4 rounded-4 bg-light border shadow-sm no-print">
+            <ul class="nav nav-pills nav-fill g-2" id="managerTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active fw-bold" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory-pane" type="button" role="tab">
+                        <i class="fa-solid fa-boxes-stacked me-1"></i> ইনভেন্টরি স্টক
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold" id="routes-tab" data-bs-toggle="tab" data-bs-target="#routes-pane" type="button" role="tab">
+                        <i class="fa-solid fa-route me-1"></i> রুট ও দোকান সেটআপ
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold" id="sr-setup-tab" data-bs-toggle="tab" data-bs-target="#sr-setup-pane" type="button" role="tab">
+                        <i class="fa-solid fa-users-gear me-1"></i> এসআর ম্যানেজমেন্ট
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold" id="memo-tab" data-bs-toggle="tab" data-bs-target="#memo-pane" type="button" role="tab">
+                        <i class="fa-solid fa-file-invoice-dollar me-1"></i> মেমো ও চালান সামারি
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content mt-3" id="managerTabContent">
+                <!-- 1. Inventory Stock Pane -->
+                <div class="tab-pane fade show active" id="inventory-pane" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex gap-2 w-50">
+                            <input type="text" id="mgrSearchInput" class="form-control" placeholder="প্রোডাক্ট খুঁজুন..." onkeyup="filterMgrProducts()">
+                            <select id="mgrCategorySelect" class="form-select" onchange="filterMgrProducts()"></select>
+                        </div>
+                        <button class="btn btn-primary" onclick="openAddProductModal()">
+                            <i class="fa-solid fa-plus-circle me-1"></i> নতুন প্রোডাক্ট যোগ করুন
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle border">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>আইডি</th>
+                                    <th>নাম</th>
+                                    <th>ক্যাটাগরি</th>
+                                    <th>ইউনিট</th>
+                                    <th>মূল স্টক</th>
+                                    <th>চলতি স্টক</th>
+                                    <th>মূল্য</th>
+                                    <th class="text-center">অ্যাকশন</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mgrProductTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 2. Routes & Shops Setup Pane -->
+                <div class="tab-pane fade" id="routes-pane" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="card p-3 shadow-sm">
+                                <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-plus me-1"></i>নতুন রুট যুক্ত করুন</h6>
+                                <div class="input-group mb-3">
+                                    <input type="text" id="newRouteInput" class="form-control" placeholder="রুটের নাম (যেমন: সাভার রুট)">
+                                    <button class="btn btn-primary" onclick="addRoute()">যোগ করুন</button>
+                                </div>
+                                <hr>
+                                <label class="form-label fw-bold">রুট নির্বাচন করুন:</label>
+                                <select id="setupRouteSelect" class="form-select" onchange="loadBazarForm()"></select>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card p-3 shadow-sm">
+                                <h6 class="fw-bold text-success mb-2"><i class="fa-solid fa-store me-1"></i>বাজার ও দোকানের তথ্য</h6>
+                                <div id="bazarInputsContainer" class="row g-2 mb-3"></div>
+                                <p id="shopSectionTitle" class="fw-bold text-secondary border-bottom pb-1"></p>
+                                <div class="table-responsive" style="max-height: 300px;">
+                                    <table class="table table-sm align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 50px;">#</th>
+                                                <th>দোকানের নাম</th>
+                                                <th>মালিকের নাম</th>
+                                                <th>ফোন নম্বর</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="shopInputsContainer"></tbody>
+                                    </table>
+                                </div>
+                                <button class="btn btn-success mt-2" onclick="saveBazarAndShops()">
+                                    <i class="fa-solid fa-floppy-disk me-1"></i> সকল তথ্য সেভ করুন
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. SR Management Pane -->
+                <div class="tab-pane fade" id="sr-setup-pane" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <form id="managerCreateSrForm" onsubmit="handleManagerCreateSR(event)" class="card p-3 shadow-sm">
+                                <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-user-plus me-1"></i>নতুন এসআর অ্যাকাউন্ট</h6>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">এসআর নাম</label>
+                                    <input type="text" id="newSrName" class="form-control" placeholder="এসআর এর নাম" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">ফোন নম্বর</label>
+                                    <input type="tel" id="newSrPhone" class="form-control" placeholder="ফোন নম্বর" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">অ্যাসাইনড রুট</label>
+                                    <select id="newSrRouteSelect" class="form-select" onchange="onSrSetupRouteSelect()"></select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">অ্যাসাইনড বাজার</label>
+                                    <select id="newSrBazarSelect" class="form-select"></select>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 fw-bold">এসআর রেজিস্টার করুন</button>
+                            </form>
+                        </div>
+                        <div class="col-md-7">
+                            <div class="card p-3 shadow-sm">
+                                <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-users me-1"></i>নিবন্ধিত এসআর তালিকা</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>এসআর আইডি</th>
+                                                <th>নাম</th>
+                                                <th>ফোন</th>
+                                                <th class="text-center">অ্যাকশন</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="srListTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Invoice & Daily Summary Pane -->
+                <div class="tab-pane fade" id="memo-pane" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-dark m-0"><i class="fa-solid fa-receipt me-1"></i>আজকের চালান সামারি</h6>
+                        <button class="btn btn-outline-dark btn-sm" onclick="printDailySummary()">
+                            <i class="fa-solid fa-print me-1"></i> সামারি প্রিন্ট করুন
+                        </button>
+                    </div>
+                    <div id="dailySummaryCard" class="card p-3 border mb-4">
+                        <div class="d-flex justify-content-between border-bottom pb-2 mb-3">
+                            <h6 class="fw-bold text-primary mb-0" id="summaryDate"></h6>
+                            <div class="d-flex gap-3 small fw-bold">
+                                <span>মোট অর্ডার: <strong id="summaryTotalOrders" class="text-dark">0</strong></span>
+                                <span>মোট আইটেম: <strong id="summaryTotalItems" class="text-dark">0 টি</strong></span>
+                                <span>মোট মূল্য: <strong id="summaryTotalAmount" class="text-success">৳ 0</strong></span>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm border">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>প্রোডাক্টের নাম</th>
+                                        <th>ক্যাটাগরি</th>
+                                        <th>মোট পরিমাণ</th>
+                                        <th>মোট মূল্য</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dailySummaryTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-list-check me-1"></i>মেমো তালিকা</h6>
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>মেমো #</th>
+                                    <th>সময়</th>
+                                    <th>এসআর</th>
+                                    <th>দোকান ও বাজার</th>
+                                    <th>বিল পরিমাণ</th>
+                                    <th class="text-center">অ্যাকশন</th>
+                                </tr>
+                            </thead>
+                            <tbody id="memoListTable"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-
-            <!-- Navigation Tabs -->
-            <div class="p-2 mb-4 rounded-4 bg-light border shadow-sm no-print">
-                <ul class="nav nav-pills nav-fill g-2" id="managerTabs" role="tablist">
+        </div>
+    </div>
+</div>
                     <li class="nav-item p-1" role="presentation">
                         <button class="nav-link active custom-tab-btn tab-inventory" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory-pane" type="button" role="tab">
                             <div class="d-flex align-items-center justify-content-center gap-2">
