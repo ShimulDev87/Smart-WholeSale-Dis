@@ -1989,15 +1989,16 @@ function updateCartUI() {
 // ==========================================
 // অর্ডার/মেমো ফায়ারবেজ ক্লাউডে সেভ করার ফাংশন (মাল্টি-টেন্যান্ট ফিক্সড)
 // ==========================================
-function saveOrderToCloud(orderData) {
-    if (typeof db !== 'undefined' && db && orderData) {
-        // কোম্পানির নাম অনুযায়ী ফায়ারবেসে সেভ করা
-        const safeCompanyName = (state.companyName || 'Smart Wholesale').replace(/[.#$\[\]]/g, "_");
-        
-        db.ref('companies/' + safeCompanyName + '/orders/' + orderData.id).set(orderData)
-            .then(() => console.log("✅ অর্ডার ক্লাউডে সফলভাবে সেভ হয়েছে!"))
-            .catch(err => console.error("❌ Order Cloud Save Error:", err));
-    }
+// অর্ডার ফায়ারবেজ ক্লাউডে সেভ করার হেলপার
+function saveOrderToCloud(newOrder) {
+    const firebaseDb = (typeof db !== 'undefined' && db) ? db : ((typeof firebase !== 'undefined' && firebase.database) ? firebase.database() : null);
+    if (!firebaseDb || !newOrder) return;
+
+    const safeCompanyName = (state.companyName || 'Smart Wholesale').replace(/[.#$\[\]]/g, "_");
+    
+    firebaseDb.ref('companies/' + safeCompanyName + '/orders/' + newOrder.id).set(newOrder)
+        .then(() => console.log("✅ অর্ডার ফায়ারবেজে সফলভাবে আপলোড হয়েছে!"))
+        .catch(err => console.error("❌ অর্ডার সেভ ত্রুটি:", err));
 }
 
 // ==========================================
@@ -2425,25 +2426,24 @@ function renderMemoList() {
 
 // ==========================================
 // সকল ডিভাইস থেকে আসা অর্ডার লাইভ সিঙ্ক করার ফাংশন
-// ==========================================
+// ক্লাউড থেকে সকল ডিভাইসের অর্ডার লাইভ সিঙ্ক করার ফাংশন
 function syncOrdersFromCloud() {
-    if (typeof db === 'undefined' || !db) return;
+    const firebaseDb = (typeof db !== 'undefined' && db) ? db : ((typeof firebase !== 'undefined' && firebase.database) ? firebase.database() : null);
+    if (!firebaseDb) return;
 
-    db.ref('orders').on('value', (snapshot) => {
+    const safeCompanyName = (state.companyName || 'Smart Wholesale').replace(/[.#$\[\]]/g, "_");
+
+    firebaseDb.ref('companies/' + safeCompanyName + '/orders').on('value', (snapshot) => {
         if (snapshot.exists()) {
-            const rawOrders = snapshot.val();
-            const orderList = Object.values(rawOrders);
-
-            if (typeof state !== 'undefined') {
-                state.orders = orderList;
-                localStorage.setItem('orders', JSON.stringify(orderList));
-
-                if (typeof generateDailySummary === 'function') generateDailySummary();
-                if (typeof renderMemoList === 'function') renderMemoList();
-            }
+            const cloudOrders = Object.values(snapshot.val() || {});
+            state.orders = cloudOrders;
+            localStorage.setItem('orders', JSON.stringify(cloudOrders));
+            
+            // সামারি শিট, মেমো তালিকা ও শপ স্ট্যাটাস রিয়েলটাইমে রিফ্রেশ
+            if (typeof generateDailySummary === 'function') generateDailySummary();
+            if (typeof renderMemoList === 'function') renderMemoList();
+            if (typeof onSRBazarSelect === 'function') onSRBazarSelect();
         }
-    }, (error) => {
-        console.error("❌ Order Sync Error:", error);
     });
 }
 
