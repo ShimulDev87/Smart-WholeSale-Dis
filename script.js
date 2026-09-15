@@ -2045,6 +2045,7 @@ function submitOrder() {
             date: displayDate,
             isoDate: isoDate,
             dayName: dayName,
+            status: 'confirmed',
             timestamp: now.getTime()
         };
 
@@ -2345,6 +2346,7 @@ function generateDailySummary() {
         console.error("Summary Generation Error: ", e); 
     }
 }
+
 
 
 // ফায়ারবেজ থেকে রিয়েলটাইম অর্ডার লিস্ট লোড ও সামারি আপডেট
