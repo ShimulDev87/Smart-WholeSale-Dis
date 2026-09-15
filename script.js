@@ -560,6 +560,18 @@ function processOrderAndDeductStock(cartItems) {
     // ৩. UI রিফ্রেশ
     if (typeof filterMgrProducts === 'function') filterMgrProducts();
 }
+
+
+// প্রোডাক্ট স্টক পরিবর্তনের পর ফায়ারবেজ সিঙ্ক করার হেলপার ফাংশন
+function syncMasterDataToCloud() {
+    if (typeof firebase !== 'undefined' && firebase.database && typeof products !== 'undefined') {
+        firebase.database().ref('companies/products').set(products)
+            .then(() => console.log("Product stock synced to Cloud!"))
+            .catch(err => console.error("Firebase Stock Sync Error:", err));
+    }
+}
+
+
 // ==========================================
 // ক্লাউড থেকে রুট, দোকান এবং প্রোডাক্ট স্টক লাইভ সিঙ্ক করার ফাংশন
 // ==========================================
