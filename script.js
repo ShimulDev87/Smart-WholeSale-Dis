@@ -2217,28 +2217,37 @@ function printDailySummary() {
 // ==========================================
 
 // ৩. আপডেট করা generateDailySummary (স্মার্ট ম্যাচিং ও ফাস্ট রেন্ডার)
-// ==========================================
-// ==========================================
-// আপডেট করা এবং সুরক্ষিত generateDailySummary ফাংশন
+// বাংলা সংখ্যা ইংরেজিতে কনভার্ট করার হেলপার
+function toEngNum(str) {
+    if (!str) return '';
+    const bnDigits = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+    return String(str).replace(/[০-৯]/g, d => bnDigits.indexOf(d));
+}
+
+// আপডেট করা সুরক্ষিত generateDailySummary
 function generateDailySummary() {
     try {
         const summaryTable = document.getElementById('dailySummaryTable');
         if (!summaryTable) return;
 
-        // ১. state.orders (Array/Object) অথবা localStorage থেকে ডাটা সংগ্রহ
+        // ১. ডাটা লোড (state.orders অথবা LocalStorage)
         let allOrders = [];
         if (typeof state !== 'undefined' && state.orders) {
             if (Array.isArray(state.orders)) {
                 allOrders = state.orders;
             } else if (typeof state.orders === 'object') {
-                allOrders = Object.values(state.orders); // ফায়ারবেজ অবজেক্টকে অ্যারেতে রূপান্তর
+                allOrders = Object.values(state.orders);
             }
-        } else {
+        }
+        
+        if (allOrders.length === 0) {
             const localOrders = localStorage.getItem('orders');
-            if (localOrders) allOrders = JSON.parse(localOrders) || [];
+            if (localOrders) {
+                try { allOrders = JSON.parse(localOrders) || []; } catch(e){}
+            }
         }
 
-        // ২. আজকের তারিখ বের করা
+        // ২. আজকের তারিখের স্ট্যান্ডার্ড রূপ (২৩/১০/২০২৬)
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -2252,11 +2261,22 @@ function generateDailySummary() {
             summaryDateEl.innerText = `তারিখ: ${todayDisplay}`;
         }
 
-        // ৩. আজকের অর্ডার ফিল্টার
+        // ৩. ফ্লেক্সিবল তারিখ ফিল্টারিং (বাংলা সংখ্যা ও টাইমস্ট্যাম্প সেফটি সহ)
         const todaysOrders = allOrders.filter(order => {
             if (!order) return false;
-            if (order.isoDate) return order.isoDate === todayIso;
-            if (order.date) return order.date === todayDisplay;
+
+            const orderIso = toEngNum(order.isoDate || '');
+            const orderDate = toEngNum(order.date || '');
+
+            if (orderIso === todayIso) return true;
+            if (orderDate === todayDisplay) return true;
+
+            // টাইমস্ট্যাম্প দিয়ে আজকের তারিখ মিলানো
+            if (order.timestamp) {
+                const orderDateObj = new Date(order.timestamp);
+                return orderDateObj.toDateString() === now.toDateString();
+            }
+
             return false;
         });
 
@@ -2265,7 +2285,7 @@ function generateDailySummary() {
         let totalItemsCount = 0;
         let productSummaryMap = {};
 
-        // ৪. প্রসেসিং ও প্রোডাক্ট ভিত্তিক হিসাব
+        // ৪. প্রোডাক্ট অনুযায়ী সামারি তৈরি
         todaysOrders.forEach(order => {
             grandTotalAmount += (parseFloat(order.totalAmount || order.total) || 0);
             const items = Array.isArray(order.items) ? order.items : [];
@@ -2287,7 +2307,7 @@ function generateDailySummary() {
             });
         });
 
-        // ৫. টেবিল রেন্ডারিং
+        // ৫. টেবিল আউটপুট
         const keys = Object.keys(productSummaryMap);
         if (keys.length === 0) {
             summaryTable.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">আজকের তারিখে কোনো কনফার্মড অর্ডার নেই।</td></tr>';
@@ -2313,22 +2333,18 @@ function generateDailySummary() {
             summaryTable.innerHTML = rowsHtml;
         }
 
-        // ৬. হেডার কার্ডের সামারি আপডেট
-        const totalOrdersEl = document.getElementById('summaryTotalOrders');
-        const totalAmountEl = document.getElementById('summaryTotalAmount');
-        const totalItemsEl = document.getElementById('summaryTotalItems');
-
-        if (totalOrdersEl) {
-            totalOrdersEl.innerText = typeof toBanglaNum === 'function' ? toBanglaNum(totalOrders) : totalOrders;
+        // ৬. মোট কার্ডের হিসাব আপডেট
+        if (document.getElementById('summaryTotalOrders')) {
+            document.getElementById('summaryTotalOrders').innerText = typeof toBanglaNum === 'function' ? toBanglaNum(totalOrders) : totalOrders;
         }
-        if (totalAmountEl) {
+        if (document.getElementById('summaryTotalAmount')) {
             const formattedGrandTotal = typeof toBanglaNum === 'function' 
                 ? toBanglaNum(grandTotalAmount.toLocaleString('en-US')) 
                 : grandTotalAmount.toLocaleString('en-US');
-            totalAmountEl.innerText = `৳ ${formattedGrandTotal}`;
+            document.getElementById('summaryTotalAmount').innerText = `৳ ${formattedGrandTotal}`;
         }
-        if (totalItemsEl) {
-            totalItemsEl.innerText = `${typeof toBanglaNum === 'function' ? toBanglaNum(totalItemsCount) : totalItemsCount} টি`;
+        if (document.getElementById('summaryTotalItems')) {
+            document.getElementById('summaryTotalItems').innerText = `${typeof toBanglaNum === 'function' ? toBanglaNum(totalItemsCount) : totalItemsCount} টি`;
         }
 
     } catch (e) { 
