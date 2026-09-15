@@ -2366,10 +2366,6 @@ function listenOrdersFromFirebase() {
     }
 }
 
-// অ্যাপ চালুর সময় ফায়ারবেজ লিসেনার চালু করা
-document.addEventListener("DOMContentLoaded", () => {
-    listenOrdersFromFirebase();
-});
 
 
 
@@ -2454,6 +2450,8 @@ function syncOrdersFromCloud() {
 // ==========================================
 // 13. APP INITIALIZATION (আপডেট ও নিরাপদ ভার্সন)
 // ==========================================
+// 13. APP INITIALIZATION (আপডেট ও পরিচ্ছন্ন ভার্সন)
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     // ১. লোকালস্টোরেজ থেকে প্রাথমিক ডাটা লোড
     loadDataFromLocalStorage();
@@ -2526,6 +2524,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof syncMasterDataFromCloud === 'function') syncMasterDataFromCloud();
     if (typeof syncOrdersFromCloud === 'function') syncOrdersFromCloud();
     if (typeof syncCompanyInfoFromCloud === 'function') syncCompanyInfoFromCloud();
+    
+    // 🆕 লাইভ অর্ডার সামারি লিসেনার
+    if (typeof listenOrdersFromFirebase === 'function') listenOrdersFromFirebase();
 
     // 📱 সার্ভিস ওয়ার্কার রেজিস্টার (PWA support)
     if ('serviceWorker' in navigator) {
